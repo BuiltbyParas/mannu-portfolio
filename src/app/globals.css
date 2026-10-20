@@ -1,0 +1,2025 @@
+@import "tailwindcss";
+
+/* ══ Tokens ════════════════════════════════════════════════════════════
+   One light world: porcelain paper, full-bleed fields of powder blue, citron
+   and ultramarine, deep ink for words. Coral appears only on the ribbon, for
+   the piece that does not fit. See docs/design-direction.md. */
+
+:root {
+  --paper: #f7f7f2;
+  --white: #ffffff;
+  --powder: #dce7ff;
+  --citron: #d6f36a;
+  --ultra: #3657f5;
+  --ultra-deep: #2442d6;
+  --coral: #ff806b;
+  --ink: #20232b;
+  --ink-soft: #4a5161;
+  --muted: #626978;
+  --mist: #e8edff;
+  --line: rgb(32 35 43 / 0.16);
+
+  --font-display: var(--font-funnel-display), "Funnel Display", ui-sans-serif, system-ui, sans-serif;
+  --font-text: var(--font-funnel-sans), "Funnel Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-code: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Type scale. The name is sized to span the content width (its glyph run is
+     about 3.3 times its font size). */
+  --gutter: clamp(1rem, 4vw, 3.5rem);
+  --t-name: min(calc((min(100vw, 100rem) - 2 * var(--gutter)) / 3.3), 50svh);
+  --t-statement: clamp(2.6rem, 1.45rem + 4.4vw, 5.75rem);
+  --t-heading: clamp(2.15rem, 1.4rem + 2.9vw, 3.9rem);
+  --t-stage: clamp(1.8rem, 1.3rem + 1.7vw, 2.6rem);
+  --t-course: clamp(1.45rem, 1.1rem + 1.25vw, 2.2rem);
+  --t-lede: clamp(1.2rem, 1.07rem + 0.42vw, 1.45rem);
+  --t-body: 1.0625rem;
+  --t-small: 0.9375rem;
+
+  --section-pad: clamp(5.5rem, 4rem + 7vh, 10.5rem);
+  --header-h: 4.5rem;
+  /* The paper-to-powder band where the opening's passage happens (see About). */
+  --passage: clamp(13rem, 30vh, 24rem);
+
+  /* Motion (mirrors src/lib/motion.ts). Entrances decelerate hard; on-screen
+     moves ease both ways; hover faces arrive in under 0.4 s and leave faster. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-face: cubic-bezier(0.19, 1, 0.22, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --t-press: 140ms;
+  --t-hover: 220ms;
+  --t-face: 380ms;
+  --t-face-out: 240ms;
+
+  /* Layers. The ribbon's canvas sits between section fields and their words. */
+  --z-under: 1;
+  --z-canvas: 2;
+  --z-content: 3;
+  --z-header: 10;
+  --z-menu: 20;
+}
+
+/* ══ Base ═════════════════════════════════════════════════════════════ */
+
+html {
+  background: var(--paper);
+  color: var(--ink);
+  /* In-page links never land a heading under the fixed header. */
+  scroll-padding-top: var(--header-h);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  scrollbar-color: color-mix(in srgb, var(--ink) 35%, transparent) var(--paper);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html:not(.lenis) {
+    scroll-behavior: smooth;
+  }
+}
+
+/* Lenis (wheel smoothing) — the library's own required rules. */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-stopped {
+  overflow: clip;
+}
+.lenis.lenis-smooth iframe {
+  pointer-events: none;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  font-family: var(--font-text);
+  font-size: var(--t-body);
+  line-height: 1.6;
+  /* Keeps Funnel's letter spacing even on high-density phone screens. */
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: clip;
+}
+
+::selection {
+  background: var(--citron);
+  color: var(--ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ultra);
+  outline-offset: 3px;
+}
+
+main:focus,
+section:focus {
+  outline: none;
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+  margin: 0;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: fixed;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: calc(var(--z-menu) + 1);
+  padding: 0.75rem 1.1rem;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--paper);
+  font-weight: 600;
+  text-decoration: none;
+  transform: translateY(-160%);
+  transition: transform 200ms var(--ease-out);
+}
+.skip-link:focus-visible {
+  transform: none;
+}
+
+.scroll-sentinel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 24px;
+  pointer-events: none;
+}
+
+.wrap {
+  width: 100%;
+  max-width: 100rem;
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+/* Words always sit above the ribbon, and the scene never draws under them
+   (sculpture/clearance.ts masks it out around each text block). The halo in
+   the section's own colour only softens anti-aliased edges; on the plain field
+   it is invisible. */
+.content {
+  position: relative;
+  z-index: var(--z-content);
+  text-shadow:
+    0 0 0.18em var(--halo, var(--paper)),
+    0 0 0.6em var(--halo, var(--paper));
+}
+.content .button,
+.content code {
+  text-shadow: none;
+}
+.curiosity {
+  --halo: var(--powder);
+}
+.certificates {
+  --halo: var(--citron);
+}
+.experience {
+  --halo: var(--white);
+}
+.contact {
+  --halo: var(--ultra);
+}
+
+/* ══ Type ═════════════════════════════════════════════════════════════ */
+
+.t-statement,
+.t-heading,
+.t-stage,
+.t-course {
+  font-family: var(--font-display);
+  font-weight: 600;
+  text-wrap: balance;
+}
+
+.t-statement {
+  font-size: var(--t-statement);
+  line-height: 0.96;
+  letter-spacing: -0.038em;
+}
+
+.t-heading {
+  font-size: var(--t-heading);
+  line-height: 1;
+  letter-spacing: -0.032em;
+}
+
+.t-stage {
+  font-size: var(--t-stage);
+  line-height: 1.04;
+  letter-spacing: -0.026em;
+}
+
+.t-course {
+  font-size: var(--t-course);
+  line-height: 1.08;
+  letter-spacing: -0.022em;
+}
+
+.t-lede {
+  font-size: var(--t-lede);
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+.t-body {
+  font-size: var(--t-body);
+  line-height: 1.62;
+  color: var(--ink-soft);
+  text-wrap: pretty;
+}
+
+/* SplitText masks (motion/intro.ts, motion/reveals.ts): a little room below
+   each masked line or word, so descenders are never cut while it rises into
+   place. Bottom only, so stacked line masks' margins cannot collapse into
+   extra height: the layout is exactly the same split or not. */
+.split-line-mask,
+.split-word-mask {
+  padding-bottom: 0.16em;
+  margin-bottom: -0.16em;
+}
+
+/* ══ Controls ═════════════════════════════════════════════════════════ */
+
+/* Pills echo the ribbon's rounded ends, and like the ribbon they have two faces.
+   The label is set on both (components/PillLabel.tsx). Hover or keyboard focus
+   turns the button over: the other face rises from below behind a domed mask,
+   its words surfacing with it, so the label reads whole at every frame (above
+   the edge on the first face, below it on the second). Press sinks it slightly.
+   The turn arrives in --t-face and leaves faster. */
+.button {
+  --face: var(--citron);
+  --face-ink: var(--ink);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  min-height: 3.25rem;
+  padding: 0 1.6rem;
+  border-radius: 999px;
+  border: 1.5px solid transparent;
+  font: 600 1rem/1 var(--font-text);
+  letter-spacing: 0;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  /* Press feedback uses `scale`, leaving `transform` free for entrances (motion/intro.ts). */
+  transition:
+    border-color var(--t-hover) ease,
+    scale var(--t-press) var(--ease-out);
+}
+.pill-face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: inherit;
+  padding: inherit;
+  border-radius: inherit;
+  background: var(--face);
+  color: var(--face-ink);
+  pointer-events: none;
+  clip-path: ellipse(70% 0% at 50% 100%);
+  /* Hidden outright at rest (after the face has dropped), so find-in-page and
+     occlusion checks never meet the copy; shown at once when the turn starts. */
+  visibility: hidden;
+  transition:
+    clip-path var(--t-face-out) var(--ease-out),
+    visibility 0s linear var(--t-face-out);
+}
+/* The face's words surface with it on the way in; on the way out they hold
+   still (two offset copies would show at the edge) and reset once hidden. */
+.pill-face > * {
+  transform: translateY(0.16em);
+  transition: transform 0s linear var(--t-face-out);
+}
+.button:active {
+  scale: 0.97;
+}
+.button:disabled,
+.button[aria-disabled="true"] {
+  opacity: 0.45;
+  pointer-events: none;
+}
+.button-primary {
+  background: var(--ultra) padding-box;
+  color: var(--white);
+}
+.button-secondary {
+  --face: var(--ink);
+  --face-ink: var(--paper);
+  border-color: var(--ink);
+  color: var(--ink);
+  background: transparent;
+}
+.button-light {
+  background: var(--white) padding-box;
+  color: var(--ultra-deep);
+}
+.button-small {
+  min-height: 2.5rem;
+  padding: 0 1.15rem;
+  font-size: 0.9375rem;
+}
+.button-icon {
+  width: 1.05em;
+  height: 1.05em;
+  flex: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .button:hover .pill-face {
+    clip-path: ellipse(125% 165% at 50% 100%);
+    visibility: visible;
+    transition:
+      clip-path var(--t-face) var(--ease-face),
+      visibility 0s;
+  }
+  .button:hover .pill-face > * {
+    transform: none;
+    transition: transform var(--t-face) var(--ease-face);
+  }
+  /* The arrow on the turned face points the way the button goes. */
+  .button:hover .pill-face .button-icon {
+    transform: translateY(2px);
+  }
+  .button:hover .pill-face .button-icon-out {
+    transform: translate(2px, -2px);
+  }
+}
+/* Touch screens have no hover: the face turns while a finger is down, quickly,
+   and drops as soon as it lifts, so a tap feels pressed without sticking. */
+@media (hover: none) {
+  .button:active .pill-face {
+    clip-path: ellipse(125% 165% at 50% 100%);
+    visibility: visible;
+    transition:
+      clip-path 160ms var(--ease-out),
+      visibility 0s;
+  }
+  .button:active .pill-face > * {
+    transform: none;
+  }
+}
+/* Keyboard focus shows the same turned face (without the arrow's lean), plus the ring. */
+.button:focus-visible .pill-face {
+  clip-path: ellipse(125% 165% at 50% 100%);
+  visibility: visible;
+  transition: visibility 0s;
+}
+.button:focus-visible .pill-face > * {
+  transform: none;
+}
+
+/* Standalone links (verify a certificate, a project, back to top): the
+   underline redraws from the left on hover and the arrow leans the way it points. */
+.text-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--ultra-deep);
+  font-weight: 600;
+  text-decoration: none;
+}
+.text-link .link-text,
+.footer-top .link-text {
+  background: linear-gradient(currentColor, currentColor) no-repeat 0 100% / 100% 1.5px;
+  padding-bottom: 0.12em;
+}
+.link-icon {
+  width: 1em;
+  height: 1em;
+  flex: none;
+  transition: transform var(--t-face) var(--ease-face);
+}
+@media (hover: hover) and (pointer: fine) {
+  .text-link:hover .link-text,
+  .footer-top:hover .link-text {
+    animation: underline-redraw 640ms var(--ease-out);
+  }
+  .text-link:hover .link-icon {
+    transform: translate(2px, -2px);
+  }
+}
+@keyframes underline-redraw {
+  0% {
+    background-position: 100% 100%;
+    background-size: 100% 1.5px;
+  }
+  45% {
+    background-position: 100% 100%;
+    background-size: 0% 1.5px;
+  }
+  46% {
+    background-position: 0 100%;
+    background-size: 0% 1.5px;
+  }
+  100% {
+    background-position: 0 100%;
+    background-size: 100% 1.5px;
+  }
+}
+
+/* ══ Ribbon layer ═════════════════════════════════════════════════════ */
+
+.sculpture-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  height: 100lvh;
+  z-index: var(--z-canvas);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 500ms var(--ease-out);
+}
+.sculpture-live .sculpture-canvas {
+  opacity: 1;
+}
+
+.slot {
+  position: relative;
+  z-index: var(--z-canvas);
+  pointer-events: none;
+}
+.slot-still {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  transition: opacity 400ms var(--ease-out);
+}
+.slot-still-phone {
+  display: none;
+}
+@media (max-width: 767px) {
+  .slot-still-wide {
+    display: none;
+  }
+  .slot-still-phone {
+    display: block;
+  }
+}
+/* When the 3D ribbon is expected, keep the stills hidden so they never flash;
+   bring them back if WebGL turns out to be unavailable. */
+.js.motion .slot-still {
+  opacity: 0;
+}
+.js.motion.no-webgl .slot-still {
+  opacity: 1;
+}
+
+/* The passage's veil: a pale ultramarine vignette around the view while the
+   scene flies through its field of points (motion/scenes.ts brings it in and
+   out with the scroll). Above the section fields, under the ribbon and words. */
+.passage-veil {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-under);
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+  background:
+    radial-gradient(115% 90% at 50% 50%, transparent 38%, rgb(54 87 245 / 0.1) 68%, rgb(36 66 214 / 0.26) 100%),
+    radial-gradient(55% 42% at 50% 50%, rgb(255 255 255 / 0.4), transparent 72%);
+}
+
+/* The trail (components/Trail.tsx, motion/trail.ts): a hairline in the right
+   margin, drawn as the page is read, with a knot where each chapter arrives and
+   a loop at the end that closes over the last stretch, at Contact. */
+.trail {
+  --trail-line: var(--line);
+  --trail-ink: var(--ultra);
+  --trail-knot: var(--paper);
+  position: fixed;
+  z-index: var(--z-content);
+  top: calc(var(--header-h) + 1.25rem);
+  bottom: 2.25rem;
+  right: calc(var(--gutter) / 2);
+  width: 0;
+  pointer-events: none;
+  display: none;
+}
+.js .trail {
+  display: block;
+}
+/* With motion it waits for the first scroll (motion/scenes.ts fades it in as the cue hands over). */
+.js.motion .trail {
+  opacity: 0;
+}
+.trail[data-light] {
+  --trail-line: rgb(255 255 255 / 0.28);
+  --trail-ink: var(--citron);
+  --trail-knot: var(--ultra);
+}
+.trail-line,
+.trail-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -0.75px;
+  width: 1.5px;
+  background: var(--trail-line);
+  transition: background-color 400ms ease;
+}
+.trail-fill {
+  left: 0;
+  width: 100%;
+  background: var(--trail-ink);
+  transform: scaleY(0);
+  transform-origin: 50% 0;
+}
+.trail-knot {
+  position: absolute;
+  left: -3.5px;
+  width: 7px;
+  height: 7px;
+  margin-top: -3.5px;
+  border: 1.5px solid var(--trail-line);
+  border-radius: 50%;
+  background: var(--trail-knot);
+  transition:
+    background-color 300ms ease,
+    border-color 300ms ease,
+    transform 500ms var(--ease-face);
+}
+.trail-knot[data-passed] {
+  border-color: var(--trail-ink);
+  background: var(--trail-ink);
+}
+.trail-loop {
+  position: absolute;
+  left: -10px;
+  bottom: -10px;
+  width: 20px;
+  height: 20px;
+  overflow: visible;
+}
+.trail-loop circle {
+  fill: none;
+  stroke: var(--trail-ink);
+  stroke-width: 1.5px;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transition: stroke 400ms ease;
+}
+.trail[data-closed] .trail-loop circle {
+  fill: var(--trail-ink);
+  fill-opacity: 0.25;
+}
+@media (max-width: 767px) {
+  .trail {
+    right: 0.45rem;
+  }
+  .trail-knot {
+    left: -3px;
+    width: 6px;
+    height: 6px;
+    margin-top: -3px;
+  }
+}
+
+/* Where one colour gives way to the next, the next swells up into the end of
+   the last as a soft dome and settles flat as it reaches its place
+   (motion/scenes.ts scrubs scaleY from 1 to 0). Flat, so invisible, by default. */
+.rise {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: min(clamp(3.5rem, 11vh, 7.5rem), calc(var(--section-pad) * 0.85));
+  /* A wide, shallow arc: its edges meet the sides of the page at about 60% of its height. */
+  clip-path: ellipse(64% 100% at 50% 100%);
+  background: var(--rise-color);
+  transform: scaleY(0);
+  transform-origin: 50% 100%;
+  pointer-events: none;
+}
+.rise-paper {
+  --rise-color: var(--paper);
+}
+.rise-citron {
+  --rise-color: var(--citron);
+}
+.rise-white {
+  --rise-color: var(--white);
+}
+.rise-ultra {
+  --rise-color: var(--ultra);
+}
+
+/* ══ Header ═══════════════════════════════════════════════════════════ */
+
+.site-header {
+  --bar: var(--paper);
+  --bar-ink: var(--ink);
+  --bar-soft: var(--ink-soft);
+  --bar-rule: var(--line);
+  --bar-mark: var(--ultra);
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: var(--z-header);
+  height: var(--header-h);
+  color: var(--bar-ink);
+  transition:
+    background-color 320ms ease,
+    box-shadow 320ms ease,
+    color 320ms ease;
+}
+/* The header takes the colour of the field beneath it. */
+.site-header[data-tone="powder"] {
+  --bar: var(--powder);
+}
+.site-header[data-tone="citron"] {
+  --bar: var(--citron);
+  --bar-rule: rgb(32 35 43 / 0.2);
+}
+.site-header[data-tone="white"] {
+  --bar: var(--white);
+}
+.site-header[data-tone="ultra"] {
+  --bar: var(--ultra);
+  --bar-ink: var(--white);
+  --bar-soft: var(--mist);
+  --bar-rule: rgb(255 255 255 / 0.22);
+  --bar-mark: var(--citron);
+}
+.site-header[data-scrolled],
+html:not(.js) .site-header {
+  background: var(--bar);
+  box-shadow: 0 1px 0 var(--bar-rule);
+}
+.site-header .button-secondary {
+  --face: var(--bar-ink);
+  --face-ink: var(--bar);
+  border-color: var(--bar-ink);
+  color: var(--bar-ink);
+}
+.site-header[data-tone="ultra"] :focus-visible {
+  outline-color: var(--citron);
+}
+.site-bar {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+/* The page opens on the name at full width, so the small one waits until the page moves. */
+.js .site-header:not([data-scrolled]) .site-bar > .wordmark {
+  visibility: hidden;
+  opacity: 0;
+  transition:
+    opacity 200ms ease,
+    visibility 0s linear 200ms;
+}
+.wordmark {
+  transition: opacity 260ms ease;
+  margin-right: auto;
+  color: inherit;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.3rem;
+  letter-spacing: -0.035em;
+  text-decoration: none;
+}
+.site-nav ul {
+  display: flex;
+  gap: clamp(1.25rem, 2.2vw, 2.25rem);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.nav-link {
+  position: relative;
+  display: inline-block;
+  padding-block: 0.4rem;
+  color: var(--bar-soft);
+  font-size: var(--t-small);
+  font-weight: 500;
+  text-decoration: none;
+  transition: color var(--t-hover) ease;
+}
+/* The underline draws in from the left on hover and leaves to the right; the
+   section being read keeps it. */
+.nav-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--bar-mark);
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform var(--t-face) var(--ease-face);
+}
+.nav-link[aria-current] {
+  color: var(--bar-ink);
+}
+.nav-link[aria-current]::after {
+  transform: scaleX(1);
+}
+@media (hover: hover) and (pointer: fine) {
+  .nav-link:hover {
+    color: var(--bar-ink);
+  }
+  .nav-link:hover::after {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+}
+.nav-link:active {
+  opacity: 0.7;
+}
+.nav-link:focus-visible {
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+/* While Contact is the section being read the pill is already filled, so its
+   other face turns citron instead (ink words), keeping hover and focus visible. */
+.nav-contact[aria-current] {
+  --face: var(--citron);
+  --face-ink: var(--ink);
+  background: var(--bar-ink);
+  color: var(--bar);
+}
+.menu-toggle {
+  display: none;
+}
+
+/* The phone menu drops down from the bar like a sheet (a rounded lower edge
+   that straightens as it lands), then its entries rise one after another. It
+   leaves faster than it arrives. */
+.menu-panel {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-menu);
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  visibility: hidden;
+  clip-path: inset(0 0 100% 0 round 0 0 50% 50% / 0 0 3rem 3rem);
+  transition:
+    clip-path 260ms var(--ease-out),
+    visibility 0s linear 260ms;
+}
+.menu-panel[data-open] {
+  visibility: visible;
+  clip-path: inset(0 0 0 0 round 0);
+  transition: clip-path 460ms var(--ease-drawer);
+}
+.menu-bar {
+  height: var(--header-h);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.menu-nav {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  padding-bottom: 2.5rem;
+}
+.menu-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* Menu entries rise out of their own masks one after another as the menu opens. */
+.menu-item {
+  overflow: clip;
+  padding-block: 0.08em;
+}
+.menu-link {
+  display: block;
+  padding: 0.3rem 0;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: clamp(2.2rem, 9vw, 3.4rem);
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+  text-decoration: none;
+  transform: translateY(105%);
+  transition:
+    transform 0s linear 220ms,
+    color var(--t-hover) ease;
+}
+.menu-panel[data-open] .menu-link {
+  transform: none;
+  transition:
+    transform 480ms var(--ease-face) calc(40ms + var(--i, 0) * 30ms),
+    color var(--t-hover) ease;
+}
+.menu-link[aria-current] {
+  color: var(--ultra-deep);
+}
+.menu-link:active {
+  color: var(--ultra);
+}
+html.menu-open {
+  overflow: hidden;
+}
+
+@media (max-width: 900px) {
+  .site-nav,
+  .nav-contact {
+    display: none;
+  }
+  .menu-toggle {
+    display: inline-flex;
+  }
+}
+
+/* ══ Sections ═════════════════════════════════════════════════════════ */
+
+.section {
+  position: relative;
+  padding-block: var(--section-pad);
+}
+
+.grid-12 {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  column-gap: 1.5rem;
+}
+
+/* ── 1. Opening ─────────────────────────────────────────────────────── */
+
+.hero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100svh;
+  padding-top: calc(var(--header-h) + clamp(1rem, 3.5vh, 2.5rem));
+  padding-bottom: clamp(2rem, 6vh, 4rem);
+}
+.hero-inner {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.hero-context {
+  color: var(--ink-soft);
+  font-size: var(--t-small);
+  font-weight: 500;
+}
+.hero-name-wrap {
+  position: relative;
+  width: max-content;
+  max-width: 100%;
+  /* room above the name for the ribbon's loop */
+  margin-top: clamp(2rem, 9vh, 5.5rem);
+  /* optical alignment: the M's side bearing */
+  margin-left: calc(var(--t-name) * -0.035);
+}
+.hero-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--t-name);
+  line-height: 0.84;
+  letter-spacing: -0.045em;
+  white-space: nowrap;
+}
+.hero-glyphs {
+  display: inline-block;
+}
+/* Each letter sits in a mask open above and to the sides but cut at the
+   baseline, so the entrance raises it out of the line. The mask also carries
+   the letter's layer: over or under the ribbon. */
+.hero-mask {
+  position: relative;
+  display: inline-block;
+  clip-path: inset(-25% -12% 0 -12%);
+}
+.hero-mask.is-over {
+  z-index: var(--z-content);
+}
+.hero-mask.is-under {
+  z-index: var(--z-under);
+}
+.hero-ch {
+  display: inline-block;
+}
+.hero-slot {
+  position: absolute;
+  inset: 0;
+}
+.hero-foot {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  column-gap: 1.5rem;
+  align-items: start;
+  padding-top: clamp(2rem, 6vh, 4rem);
+}
+.hero-tagline {
+  grid-column: 1 / span 5;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: clamp(1.85rem, 1.15rem + 1.75vw, 2.85rem);
+  line-height: 1.04;
+  letter-spacing: -0.03em;
+}
+.hero-tagline-line {
+  display: block;
+}
+.hero-aside {
+  grid-column: 7 / span 6;
+  max-width: 37rem;
+}
+.hero-intro {
+  color: var(--ink-soft);
+  font-size: var(--t-body);
+  line-height: 1.62;
+  text-wrap: pretty;
+}
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.75rem;
+}
+
+/* The scroll cue: a short line with a bead travelling down it while the page is
+   still. The first scroll takes over: the bead stops, the line fills with the
+   scroll's own progress, the word drops away and the trail in the margin takes
+   over (motion/scenes.ts). Scrolling back up reverses all of it. */
+.hero-cue {
+  position: absolute;
+  right: var(--gutter);
+  bottom: clamp(2rem, 6vh, 4rem);
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.hero-cue-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7rem;
+}
+.hero-cue-label {
+  writing-mode: vertical-rl;
+}
+.hero-cue-line {
+  position: relative;
+  width: 1.5px;
+  height: 3.5rem;
+  overflow: hidden;
+  background: var(--line);
+}
+.hero-cue-line::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 40%;
+  background: var(--ultra);
+  animation: cue-travel 2.4s var(--ease-in-out) infinite;
+  transition: opacity 200ms ease;
+}
+.hero-cue-fill {
+  position: absolute;
+  inset: 0;
+  background: var(--ultra);
+  transform: scaleY(0);
+  transform-origin: 50% 0;
+}
+.hero-cue-inner.is-moving .hero-cue-line::after {
+  opacity: 0;
+  animation-play-state: paused;
+}
+@keyframes cue-travel {
+  from {
+    transform: translateY(-100%);
+  }
+  to {
+    transform: translateY(250%);
+  }
+}
+
+/* The entrance hides these only when it will run (`.js.motion`) and hands over
+   to its timeline with `intro-live`; if it never starts, a failsafe shows
+   everything after 3.2 s. */
+.js.motion:not(.intro-live) [data-intro] {
+  opacity: 0;
+  animation: intro-failsafe 0s linear 3.2s forwards;
+}
+.js.motion:not(.intro-live) .hero-ch {
+  transform: translateY(112%);
+  animation: intro-failsafe 0s linear 3.2s forwards;
+}
+@keyframes intro-failsafe {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── 2. Curiosity ───────────────────────────────────────────────────── */
+
+/* The section opens with the passage: a band where the paper clears into
+   powder blue while the 3D scene flies through its field of points. */
+.curiosity {
+  padding-top: 0;
+  background: linear-gradient(to bottom, var(--paper), var(--powder) var(--passage)) no-repeat;
+  background-color: var(--powder);
+}
+.curiosity-passage {
+  height: calc(var(--passage) + var(--section-pad) * 0.5);
+}
+/* Links to #about land on the statement, past the passage band (Lenis reads this too). */
+#about {
+  scroll-margin-top: calc(clamp(1rem, 5vh, 3rem) - var(--passage) - var(--section-pad) * 0.5);
+}
+.curiosity-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  column-gap: 1.5rem;
+  row-gap: clamp(1rem, 3vh, 2.25rem);
+}
+.curiosity-title {
+  grid-column: 1 / span 10;
+  max-width: 14ch;
+}
+.curiosity-slot {
+  grid-column: 1 / span 7;
+  height: clamp(300px, 50vh, 520px);
+}
+.curiosity-copy {
+  grid-column: 8 / span 5;
+  align-self: center;
+  max-width: 31rem;
+}
+.curiosity-copy .t-body {
+  margin-top: 1.25rem;
+}
+
+/* A marked word: a thread drawn under it that ties one small loop near its end
+   (sections/Emphasis.tsx), drawn left to right once the statement has arrived
+   (data-mark set by motion/reveals.ts) and simply present without motion. */
+.em {
+  position: relative;
+  white-space: nowrap;
+}
+.em-loop {
+  position: absolute;
+  left: -0.02em;
+  top: calc(100% - 0.12em);
+  width: calc(100% + 0.12em);
+  height: auto;
+  aspect-ratio: 300 / 50;
+  overflow: visible;
+  pointer-events: none;
+}
+.em-loop path {
+  fill: none;
+  stroke: var(--ultra);
+  /* In the drawing's own units, so the thread scales with the type. */
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 1400ms var(--ease-in-out);
+}
+[data-mark="pending"] .em-loop path {
+  stroke-dashoffset: 1;
+}
+
+/* ── 3. How I learn ─────────────────────────────────────────────────── */
+
+.learn-head > * {
+  max-width: 64rem;
+}
+.learn-head .t-heading {
+  max-width: 17ch;
+}
+.learn-intro {
+  margin-top: 1.5rem;
+  max-width: 40rem;
+  color: var(--ink-soft);
+}
+.learn-track {
+  position: relative;
+  margin-top: clamp(1.5rem, 5vh, 4rem);
+}
+.learn-stages {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.learn-visual,
+.stage-anchor {
+  display: none;
+}
+.stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 84svh;
+}
+.stage-slot {
+  width: 100%;
+  height: 40svh;
+}
+/* Each stage's number sits on the rail, its words beside it. */
+.stage-text {
+  display: grid;
+  grid-template-columns: 2.75rem minmax(0, 1fr);
+  column-gap: clamp(1rem, 2vw, 1.5rem);
+  align-items: baseline;
+  max-width: 34rem;
+  margin-top: 0.5rem;
+}
+.stage-text > .t-stage,
+.stage-text > .stage-body {
+  grid-column: 2;
+}
+.stage-num {
+  position: relative;
+  grid-row: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1.5px solid currentColor;
+  border-radius: 999px;
+  /* Opaque, so the rail passes behind it. */
+  background: var(--paper);
+  color: var(--ultra-deep);
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 600;
+  /* `scale`, not `transform`: the entrance (motion/reveals.ts) animates transform with GSAP. */
+  transition:
+    background-color 400ms ease,
+    color 400ms ease,
+    border-color 400ms ease,
+    scale 600ms var(--ease-face);
+}
+.stage-body {
+  margin-top: 0.85rem;
+  color: var(--ink-soft);
+}
+
+/* The rail joining the numbers (motion/stages.ts sets its place and length and
+   draws the ultramarine fill with the scroll). Under the numbers and the ribbon. */
+.learn-rail {
+  position: absolute;
+  width: 1.5px;
+  margin-left: -0.75px;
+  background: var(--line);
+  pointer-events: none;
+  display: none;
+}
+.js .learn-rail {
+  display: block;
+}
+.learn-rail-fill {
+  position: absolute;
+  inset: 0;
+  background: var(--ultra);
+  transform: scaleY(0);
+  transform-origin: 50% 0;
+}
+/* The payoff: when the last stage becomes current, its number rings out once in citron. */
+.stage-num::after {
+  content: "";
+  position: absolute;
+  inset: -1.5px;
+  border-radius: inherit;
+  border: 2px solid var(--citron);
+  opacity: 0;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .js .stage[data-stage="3"][data-active] .stage-num::after {
+    animation: knot-ring 1300ms var(--ease-out) 350ms both;
+  }
+}
+@keyframes knot-ring {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(2.1);
+  }
+}
+.stage .t-stage,
+.stage-body {
+  transition: color 400ms ease;
+}
+/* With scripts, the stage on the reading line leads: upcoming stages wait in
+   grey, finished ones keep a filled number. Without scripts every stage reads
+   as current. */
+.js .stage:not([data-active]) .t-stage,
+.js .stage:not([data-active]) .stage-body {
+  color: var(--muted);
+}
+.js .stage:not([data-active]):not([data-done]) .stage-num {
+  color: var(--muted);
+}
+.js .stage[data-done] .stage-num {
+  background: var(--powder);
+  border-color: var(--ultra);
+  color: var(--ultra-deep);
+}
+.js .stage[data-active] .stage-num {
+  background: var(--ultra);
+  border-color: var(--ultra);
+  color: var(--white);
+  scale: 1.08;
+}
+/* The last stage closes the method: its title gets the citron stroke. */
+.stage[data-stage="3"] .stage-title {
+  background: linear-gradient(var(--citron), var(--citron)) no-repeat 0 92% / 0% 0.26em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  transition: background-size 1100ms var(--ease-in-out) 250ms;
+}
+.stage[data-stage="3"][data-active] .stage-title,
+html:not(.js) .stage[data-stage="3"] .stage-title {
+  background-size: 100% 0.26em;
+}
+
+/* Large screens with scripts: one sticky box beside the stages. The ribbon
+   holds it and transforms in place as each stage reaches the middle of the
+   screen (sculpture/controller.ts reads the anchors and the box). */
+@media (min-width: 1024px) {
+  .js .learn-track {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    column-gap: 1.5rem;
+  }
+  .js .learn-visual {
+    display: block;
+    grid-column: 1 / span 6;
+    grid-row: 1;
+  }
+  .js .learn-box {
+    --box: min(64svh, 600px);
+    position: sticky;
+    top: calc(var(--header-h) + (100svh - var(--header-h) - var(--box)) / 2);
+    height: var(--box);
+  }
+  .js .learn-stages {
+    grid-column: 8 / span 5;
+    grid-row: 1;
+    padding-bottom: 12svh;
+  }
+  .js .stage {
+    min-height: 74svh;
+  }
+  .js .stage-anchor {
+    display: block;
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  .js .stage-slot {
+    display: none;
+  }
+  .js .stage-text {
+    margin-top: 0;
+  }
+  .js .stage .t-stage {
+    font-size: clamp(2.2rem, 1.4rem + 1.9vw, 3.4rem);
+  }
+}
+/* No scripts on a large screen: each stage keeps its slot beside its words. */
+@media (min-width: 1024px) {
+  html:not(.js) .stage {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    column-gap: 1.5rem;
+    align-items: center;
+    min-height: 78vh;
+  }
+  html:not(.js) .stage-slot {
+    grid-column: 1 / span 6;
+    height: min(50vh, 460px);
+  }
+  html:not(.js) .stage-text {
+    grid-column: 8 / span 5;
+  }
+}
+
+/* The still drawings in the sticky box (no WebGL or reduced motion): the
+   current stage's form, crossfading. Hidden while the 3D scene runs. */
+.learn-box {
+  position: relative;
+  --stills: 1;
+}
+.js.motion .learn-box {
+  --stills: 0;
+}
+.js.motion.no-webgl .learn-box {
+  --stills: 1;
+}
+.learn-still {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  opacity: calc(var(--on, 0) * var(--stills));
+  transition: opacity 600ms var(--ease-out);
+}
+.learn:not([data-step]) .learn-still[data-for="0"],
+.learn[data-step="0"] .learn-still[data-for="0"],
+.learn[data-step="1"] .learn-still[data-for="1"],
+.learn[data-step="2"] .learn-still[data-for="2"],
+.learn[data-step="3"] .learn-still[data-for="3"] {
+  --on: 1;
+}
+
+/* ── 4. Foundations ─────────────────────────────────────────────────── */
+
+.foundations-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  column-gap: 1.5rem;
+  row-gap: clamp(2.5rem, 7vh, 5rem);
+}
+.foundations-head {
+  grid-column: 1 / span 8;
+}
+.foundations-head .t-statement {
+  max-width: 13ch;
+}
+/* "Room to grow.": its words ease apart as the heading travels up the screen
+   (--grow, 0–1, scrubbed by motion/scenes.ts; 0 and still without motion). */
+.grow-word {
+  display: inline-block;
+  transform: translateX(calc(var(--grow, 0) * var(--i, 0) * 0.16em));
+}
+.foundations-intro {
+  margin-top: 1.75rem;
+  max-width: 40rem;
+  color: var(--ink-soft);
+}
+.courses {
+  grid-column: 1 / span 7;
+  grid-row: 2;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.foundations-slot {
+  grid-column: 9 / span 4;
+  grid-row: 2;
+  min-height: 420px;
+}
+.course {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 0.75rem 2rem;
+  align-items: baseline;
+  padding: 1.6rem 0 2.1rem;
+}
+/* A list item's top rule (courses, certificates, experience), drawn across as
+   the item arrives (motion/reveals.ts, data-reveal="ruled"). */
+.rule {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1.5px;
+  background: var(--ink);
+  transform-origin: left center;
+}
+.course-detail .t-body {
+  margin: 0;
+}
+.course-code {
+  display: inline-block;
+  margin-top: 0.6rem;
+  color: var(--ultra-deep);
+  font-family: var(--font-code);
+  font-size: 0.875rem;
+}
+/* Hovering a foundation: an ultramarine rule runs over the ink one, the name
+   steps forward, and (with the 3D scene) its turn of the coil lifts. */
+.course::after {
+  content: "";
+  position: absolute;
+  inset: -0.75px 0 auto 0;
+  height: 3px;
+  background: var(--ultra);
+  transform: scaleX(0);
+  transform-origin: right center;
+  transition: transform var(--t-face) var(--ease-face);
+}
+/* Hover moves on `translate`, leaving `transform` to the entrance (motion/reveals.ts). */
+.course .t-course {
+  transition:
+    translate var(--t-face) var(--ease-face),
+    color var(--t-hover) ease;
+}
+.course-code {
+  transition:
+    background-color var(--t-hover) ease,
+    box-shadow var(--t-hover) ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .course:hover::after {
+    transform: scaleX(1);
+    transform-origin: left center;
+  }
+  .course:hover .t-course {
+    translate: 0.6rem 0;
+    color: var(--ultra-deep);
+  }
+  .course:hover .course-code {
+    background: var(--citron);
+    box-shadow: 0 0 0 0.3em var(--citron);
+  }
+}
+
+.projects {
+  grid-column: 1 / span 7;
+}
+.projects-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.35rem;
+  letter-spacing: -0.02em;
+}
+.project-list {
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.project {
+  padding: 1.25rem 0;
+  border-top: 1px solid var(--line);
+}
+.project-head {
+  display: flex;
+  gap: 1rem;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.project-name {
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+.project-year,
+.project-tools {
+  color: var(--muted);
+  font-size: var(--t-small);
+}
+.project-summary {
+  margin-top: 0.4rem;
+  color: var(--ink-soft);
+}
+.project-links {
+  display: flex;
+  gap: 1.25rem;
+  margin-top: 0.6rem;
+}
+
+/* ── 5. Certificates ────────────────────────────────────────────────── */
+
+/* Colour fields (Certificates, Contact) are their own layer, positioned
+   without a z-index so the ribbon's canvas passes between the field and the
+   words. Each arrives as a dome rising into the end of the section before it
+   (`.rise`, above). */
+.field-section > .field {
+  position: absolute;
+  inset: 0;
+  background: var(--field);
+}
+.field-section > .wrap {
+  position: relative;
+}
+.certificates {
+  --field: var(--citron);
+}
+.certificates-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  column-gap: 1.5rem;
+  row-gap: 3rem;
+  align-items: center;
+}
+.certificates-copy {
+  grid-column: 1 / span 6;
+}
+.certificates-copy .t-statement {
+  max-width: 11ch;
+}
+.certificates-text {
+  margin-top: 2rem;
+  max-width: 34rem;
+}
+.certificates-text .t-body {
+  margin-top: 1.1rem;
+}
+.certificates .t-body,
+.certificates .ledger-caption {
+  color: var(--ink-soft);
+}
+.ledger {
+  grid-column: 7 / span 6;
+  margin: 0;
+}
+.certificates-slot {
+  height: clamp(320px, 58vh, 580px);
+}
+.ledger-caption {
+  /* Clear of the ledger's last row, so the words' clearance (sculpture/clearance.ts) never trims a mark. */
+  margin-top: 2rem;
+  font-size: var(--t-small);
+  text-align: center;
+}
+.cert-block {
+  margin-top: 2.5rem;
+}
+.cert-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cert {
+  position: relative;
+  display: flex;
+  gap: 1.25rem;
+  justify-content: space-between;
+  padding: 1.25rem 0;
+}
+/* Hovering a certificate: an ultramarine rule runs over the ink one and the title steps forward. */
+.cert::after {
+  content: "";
+  position: absolute;
+  inset: -0.75px 0 auto 0;
+  height: 3px;
+  background: var(--ultra);
+  transform: scaleX(0);
+  transform-origin: right center;
+  transition: transform var(--t-face) var(--ease-face);
+}
+.cert-title {
+  transition: translate var(--t-face) var(--ease-face);
+}
+@media (hover: hover) and (pointer: fine) {
+  .cert:hover::after {
+    transform: scaleX(1);
+    transform-origin: left center;
+  }
+  .cert:hover .cert-title {
+    translate: 0.4rem 0;
+  }
+}
+.cert:focus-within::after {
+  transform: scaleX(1);
+  transform-origin: left center;
+}
+.cert-title {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.cert-meta {
+  margin-top: 0.25rem;
+  color: var(--ink-soft);
+}
+.cert-date::before {
+  content: ", ";
+}
+.cert .text-link {
+  margin-top: 0.5rem;
+  color: var(--ink);
+}
+.cert-thumb {
+  position: relative;
+  flex: none;
+  width: 8rem;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: var(--white);
+}
+.cert-thumb img {
+  object-fit: cover;
+}
+.archive-panel {
+  margin-top: 0.5rem;
+}
+.archive-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 1rem;
+  padding: 0.65rem 1.1rem;
+  border: 1.5px solid var(--ink);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font: 600 0.9375rem/1 var(--font-text);
+  cursor: pointer;
+  transition: transform 140ms var(--ease-out);
+}
+.archive-toggle:active {
+  transform: scale(0.97);
+}
+.archive-sign {
+  position: relative;
+  width: 0.75rem;
+  height: 0.75rem;
+}
+.archive-sign::before,
+.archive-sign::after {
+  content: "";
+  position: absolute;
+  inset: 50% 0 auto;
+  height: 1.5px;
+  background: currentColor;
+  transition: transform 200ms var(--ease-out);
+}
+.archive-sign::after {
+  transform: rotate(90deg);
+}
+.archive-sign[data-open]::after {
+  transform: rotate(0deg);
+}
+
+/* ── 6. Experience ──────────────────────────────────────────────────── */
+
+.experience {
+  background: var(--white);
+  overflow: clip;
+}
+.experience-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  column-gap: 1.5rem;
+}
+.experience-head {
+  grid-column: 6 / span 7;
+}
+.experience-head .t-heading {
+  max-width: 15ch;
+}
+.experience-intro {
+  margin-top: 1.5rem;
+  max-width: 36rem;
+  color: var(--ink-soft);
+}
+.experience-slot {
+  grid-column: 1 / -1;
+  height: clamp(170px, 30vh, 300px);
+  margin-top: clamp(1.5rem, 5vh, 3.5rem);
+  margin-right: calc(-1 * var(--gutter));
+}
+.timeline {
+  grid-column: 6 / span 7;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.timeline-entry {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(7rem, 0.35fr) 1fr;
+  gap: 1.5rem;
+  padding: 1.5rem 0;
+}
+.timeline-period {
+  color: var(--muted);
+  font-size: var(--t-small);
+}
+.timeline-role {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.timeline-org {
+  color: var(--ink-soft);
+}
+.timeline-summary {
+  margin-top: 0.5rem;
+  color: var(--ink-soft);
+}
+
+/* ── 7. Contact + footer ────────────────────────────────────────────── */
+
+.contact {
+  --field: var(--ultra);
+  color: var(--white);
+  padding-bottom: clamp(4rem, 10vh, 7rem);
+}
+.contact :focus-visible,
+.site-footer :focus-visible {
+  outline-color: var(--citron);
+}
+.contact-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  column-gap: 1.5rem;
+  align-items: center;
+  min-height: min(72vh, 46rem);
+}
+.contact-copy {
+  grid-column: 1 / span 7;
+  grid-row: 1;
+}
+.contact-title {
+  max-width: 12ch;
+}
+.contact-intro {
+  margin-top: 1.75rem;
+  max-width: 32rem;
+  color: var(--mist);
+}
+.contact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 2.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.contact-slot {
+  grid-column: 8 / span 5;
+  grid-row: 1;
+  height: clamp(300px, 58vh, 560px);
+}
+
+.site-footer {
+  position: relative;
+  background: var(--ultra);
+  color: var(--mist);
+}
+.footer-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 2rem;
+  align-items: center;
+  justify-content: space-between;
+  padding-block: 1.75rem 2.25rem;
+  border-top: 1px solid rgb(255 255 255 / 0.22);
+  font-size: var(--t-small);
+}
+.footer-top {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--white);
+  font-weight: 600;
+  text-decoration: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .footer-top:hover .link-icon {
+    transform: translateY(-3px);
+  }
+}
+
+/* ══ Tablet and phone ═════════════════════════════════════════════════ */
+
+@media (max-width: 1023px) {
+  .hero-tagline {
+    grid-column: 1 / -1;
+  }
+  .hero-aside {
+    grid-column: 1 / -1;
+    margin-top: 1.5rem;
+  }
+
+  /* Tablet and phone: the ribbon gets its own band above the words it belongs to. */
+  .curiosity-grid,
+  .foundations-grid,
+  .certificates-grid,
+  .contact-grid {
+    display: flex;
+    flex-direction: column;
+  }
+  .curiosity-grid {
+    row-gap: 0;
+  }
+  .curiosity-slot {
+    width: 100%;
+    height: 40svh;
+    margin-block: 1rem;
+  }
+  .curiosity-copy {
+    max-width: 36rem;
+  }
+  .hero-cue {
+    display: none;
+  }
+
+  .foundations-grid {
+    row-gap: 0;
+  }
+  .foundations-slot {
+    order: 2;
+    width: 100%;
+    min-height: 0;
+    height: 46svh;
+    margin-block: 1.5rem 0.5rem;
+  }
+  .courses {
+    order: 3;
+  }
+  .projects {
+    order: 4;
+    margin-top: 2rem;
+  }
+
+  .certificates-grid {
+    row-gap: 2rem;
+    align-items: stretch;
+  }
+  .certificates-slot {
+    height: 44svh;
+  }
+
+  .contact-grid {
+    min-height: 0;
+  }
+  .contact-slot {
+    order: -1;
+    width: 100%;
+    height: 40svh;
+    margin-bottom: 1.5rem;
+  }
+}
+
+@media (max-width: 767px) {
+  :root {
+    --header-h: 4rem;
+  }
+  .hero {
+    padding-top: calc(var(--header-h) + 1rem);
+    padding-bottom: 1.75rem;
+  }
+  .hero-context-sep {
+    display: none;
+  }
+  .hero-context span:not(.hero-context-sep) {
+    display: block;
+  }
+  /* The slot doubles upward on phones, giving the ribbon's loop the room above the name. */
+  .hero-name-wrap {
+    margin-top: calc(var(--t-name) * 0.9);
+  }
+  .hero-slot {
+    inset: auto 0 0 0;
+    height: 200%;
+  }
+  .hero-foot {
+    display: block;
+    padding-top: 1.75rem;
+  }
+  .hero-tagline {
+    font-size: 1.9rem;
+  }
+  .hero-aside {
+    margin-top: 1.25rem;
+  }
+  .hero-intro {
+    font-size: 1rem;
+    line-height: 1.58;
+  }
+  .hero-actions {
+    margin-top: 1.4rem;
+    gap: 0.6rem;
+  }
+  .hero-actions .button {
+    min-height: 3rem;
+    padding: 0 1.25rem;
+  }
+  .stage {
+    min-height: 76svh;
+  }
+  .stage-slot {
+    height: 36svh;
+  }
+
+  .experience-grid {
+    display: flex;
+    flex-direction: column;
+  }
+  .curiosity-slot {
+    height: 44svh;
+  }
+
+  .course {
+    grid-template-columns: 1fr;
+    padding: 1.3rem 0 1.6rem;
+  }
+
+
+  .experience-head {
+    order: 1;
+  }
+  .experience-slot {
+    order: 2;
+    width: calc(100% + var(--gutter));
+    height: 24svh;
+  }
+  .timeline {
+    order: 3;
+  }
+  .timeline-entry {
+    grid-template-columns: 1fr;
+    gap: 0.4rem;
+  }
+
+}
+
+/* ══ Reduced motion ═══════════════════════════════════════════════════
+   Fewer, gentler changes: faces crossfade instead of rising, labels stay put,
+   the cue stops travelling. Colour and state changes that carry meaning stay. */
+
+@media (prefers-reduced-motion: reduce) {
+  .pill-face {
+    clip-path: none !important;
+    opacity: 0;
+    transition:
+      opacity var(--t-hover) ease,
+      visibility 0s linear var(--t-hover);
+  }
+  .button:hover .pill-face,
+  .button:focus-visible .pill-face {
+    opacity: 1;
+    transition: opacity var(--t-hover) ease;
+  }
+  .pill-face > *,
+  .button-icon,
+  .link-icon {
+    transform: none !important;
+  }
+  .course .t-course,
+  .cert-title {
+    translate: none !important;
+  }
+  .menu-panel,
+  .menu-panel[data-open] {
+    clip-path: none;
+    opacity: 0;
+    transition:
+      opacity 200ms ease,
+      visibility 0s linear 200ms;
+  }
+  .menu-panel[data-open] {
+    opacity: 1;
+    transition: opacity 200ms ease;
+  }
+  .text-link:hover .link-text,
+  .footer-top:hover .link-text {
+    animation: none;
+  }
+  .menu-link,
+  .menu-panel[data-open] .menu-link {
+    transform: none;
+    transition: color var(--t-hover) ease;
+  }
+  .hero-cue-line::after {
+    animation: none;
+    transform: translateY(75%);
+  }
+  .js .stage[data-active] .stage-num {
+    scale: none;
+  }
+}
