@@ -60,6 +60,8 @@ export type FormSpec = {
   ripple?: number;
   /** How sequential the change into this form is along the strip (0 all at once; default 0.38). */
   stagger?: number;
+  /** When each part of the strip takes its turn in that change (0–1); by default, in order along the strip. */
+  order?: (s: number) => number;
   /** Narrowest box (width ÷ height) the form fills; narrower boxes scale it down to fit. */
   minAspect: number;
 };
@@ -226,6 +228,14 @@ function ledger(s: number, aspect: number): Vec3 {
   const along = (u - 0.5) * len * dir;
   return [xc + along * Math.sin(lean), yc + along * Math.cos(lean), 0];
 }
+/** The ledger is written a row at a time: five short waves, each running quickly left to right. */
+const WAVE_SPREAD = 0.3;
+function ledgerOrder(s: number) {
+  const k = Math.min(MARKS - 1, Math.floor(s * MARKS));
+  const c = k % LEDGER.columns;
+  const r = Math.floor(k / LEDGER.columns);
+  return (r + (WAVE_SPREAD * c) / (LEDGER.columns - 1)) / (LEDGER.rows - 1 + WAVE_SPREAD);
+}
 
 /* Experience: one long strand running out toward the edge of the page. */
 function strand(s: number, aspect: number): Vec3 {
@@ -341,8 +351,9 @@ export const FORMS: Record<FormId, FormSpec> = {
     thickness: 0.02,
     pieces: MARKS,
     gap: LEDGER_GAP,
-    // The marks arrive almost one at a time, like a tally being written.
+    // The marks arrive in waves, a row at a time, like a tally being written.
     stagger: 0.85,
+    order: ledgerOrder,
     facing: 1,
     idle: 0,
     // No sway, so the count reads still; the whole ledger only tips a little toward the pointer, for depth.

@@ -1,106 +1,290 @@
 import { threadSignals } from "@/components/sculpture/signals";
 import { gsap, ScrollTrigger, SplitText } from "@/lib/gsap";
 import { DURATION, EASE, ENTER_AT, STAGGER } from "@/lib/motion";
-import { ariaFor } from "./split";
+import { ariaFor, lineGroups, token } from "./split";
 
 /*
  * Section motion, declared in the markup and built here in page order (so
- * ScrollTriggers refresh top to bottom). Each kind is a different reading
- * pace, so no two sections arrive the same way:
+ * ScrollTriggers refresh top to bottom). One small vocabulary, set by what the
+ * words are doing, so no two headings arrive the same way and reading text
+ * always arrives calmly:
  *
- *   data-reveal="lines"    heading lines rise out of a mask
- *   data-reveal="words"    the same, word by word (the Curiosity statement)
- *   data-reveal="wipe"     lines uncover left to right (Experience, after its long strand)
- *   data-reveal="lede"     a paragraph's lines rise in readable chunks, slower than a heading
- *   data-reveal="fade"     the element, or with data-reveal-children its children, settle in
- *   data-reveal="stage"    a learning stage: its marker comes into focus, then title, then words
- *   data-reveal="ruled"    a list whose items each draw their rule, then their words arrive
- *                          (with data-reveal-turns, each item also lifts its turn of the coil)
+ *   data-reveal="index"     a chapter mark: its rule draws, its number and name rise
+ *   data-reveal="question"  Curiosity: lines lift a short way through their masks and run
+ *                           straight on into the thread drawn under "questions." as it turns ultramarine
+ *   data-reveal="progress"  How I learn: lines rise, then the words fill from slate to
+ *                           ink with the scroll (its last words to ultramarine)
+ *   data-reveal="phrases"   Foundations: the first sentence rises by lines, the second
+ *                           ("Room to grow.") word by word inside its line, a beat later
+ *   data-reveal="rise"      a heading's lines rise out of their masks (Certificates)
+ *   data-reveal="wipe"      lines uncover left to right (Experience, after its long strand)
+ *   data-reveal="finale"    Contact: the opening lines rise together, the last one later
+ *                           and slower, and its tinted word settles into citron
+ *   data-reveal="lede"      a paragraph in two or three groups of lines, small and calm
+ *   data-reveal="fade"      the element, or with data-reveal-children its children, settle in
+ *   data-reveal="stage"     a learning stage: its number wipes up, its title rises word by
+ *                           word, then its sentence
+ *   data-reveal="ruled"     a list: each item's knot appears, its rule draws from it, its
+ *                           label rises, then its details (with data-reveal-turns, each
+ *                           item also lifts its turn of the coil)
  *
- * Optional: data-reveal-delay (seconds). A heading holding `.em` gets its mark
- * drawn once its words have landed.
+ * Optional: data-reveal-delay (seconds).
  *
- * Entrances play once and then hand the element back as plain, unsplit text.
+ * Where the opening's stage is in use (`stage`), the words on it arrive with
+ * the stage's own progress instead (opening.ts) and are skipped here.
+ *
+ * Entrances play once and then hand the element back as plain, unsplit text
+ * (only the scroll-linked heading stays split, for as long as it is linked).
  * Nothing is hidden by CSS: the start state is applied here, so if this never
- * runs the content is simply already in place.
+ * runs the content is simply already in place, in its final colours.
  */
-export function setupReveals() {
+export function setupReveals(stage = false) {
   const cleanups: (() => void)[] = [];
   const restored = window.scrollY > 0;
   for (const el of Array.from(document.querySelectorAll<HTMLElement>("[data-reveal]"))) {
     if (el.closest("#top")) continue; // the opening has its own sequence
+    if (stage && el.closest(".opening-stage")) continue;
     // Already on screen when the page opens partway down: leave it be.
-    if (restored && ScrollTrigger.isInViewport(el, 0.05)) {
-      el.dataset.mark = "on";
-      continue;
-    }
-    const kind = el.dataset.reveal;
+    if (restored && ScrollTrigger.isInViewport(el, 0.05)) continue;
     const delay = Number(el.dataset.revealDelay ?? 0);
-    if (kind === "lines" || kind === "words" || kind === "wipe" || kind === "lede") cleanups.push(split(el, kind, delay));
-    else if (kind === "fade") fade(el, delay);
-    else if (kind === "stage") cleanups.push(stage(el));
-    else if (kind === "ruled") ruled(el);
+    const build = BUILD[el.dataset.reveal ?? ""];
+    if (build) cleanups.push(build(el, delay) ?? (() => {}));
   }
   return () => cleanups.forEach((cleanup) => cleanup());
 }
 
-function split(el: HTMLElement, kind: "lines" | "words" | "wipe" | "lede", delay: number) {
-  const marker = el.querySelector(".em");
-  if (marker) el.dataset.mark = "pending";
+type Build = (el: HTMLElement, delay: number) => (() => void) | void;
+
+const BUILD: Record<string, Build> = {
+  index,
+  question,
+  progress,
+  phrases,
+  rise: (el, delay) =>
+    entrance(el, { type: "lines", mask: "lines" }, delay, (self, tl) => {
+      tl.from(self.lines, { yPercent: 105, duration: DURATION.line, stagger: STAGGER.lines });
+    }),
+  wipe: (el, delay) =>
+    // The clip reaches past each line's box so ascenders, descenders and the full stop are never cut.
+    entrance(el, { type: "lines" }, delay, (self, tl) => {
+      tl.fromTo(
+        self.lines,
+        { clipPath: "inset(-20% 100% -30% -2%)", x: -28 },
+        { clipPath: "inset(-20% -4% -30% -2%)", x: 0, duration: DURATION.heading + 0.15, stagger: STAGGER.lines + 0.03 },
+      );
+    }),
+  finale,
+  lede,
+  fade,
+  stage,
+  ruled: (el) => ruled(el),
+};
+
+/**
+ * The common shape of a split entrance: split (and re-split if fonts or the
+ * width change before it plays), build a timeline that starts as the element
+ * enters, and hand the element back as plain text once it has played.
+ */
+function entrance(
+  el: HTMLElement,
+  vars: SplitText.Vars,
+  delay: number,
+  build: (self: SplitText, tl: gsap.core.Timeline) => void,
+  opts: { start?: string; keep?: boolean; done?: () => void } = {},
+) {
   const instance = SplitText.create(el, {
-    type: kind === "words" ? "lines,words" : "lines",
-    mask: kind === "words" ? "words" : kind === "wipe" ? undefined : "lines",
     linesClass: "split-line",
     wordsClass: "split-word",
     aria: ariaFor(el),
-    // The drawn mark under a word is not text; leave it where it is.
-    ignore: ".em-loop",
     autoSplit: true,
+    ...vars,
     onSplit(self) {
-      const targets = kind === "words" ? self.words : self.lines;
-      const timing: gsap.TweenVars = {
-        ease: EASE.enter,
+      const tl = gsap.timeline({
         delay,
-        scrollTrigger: { trigger: el, start: ENTER_AT, once: true },
+        defaults: { ease: EASE.enter },
+        scrollTrigger: { trigger: el, start: opts.start ?? ENTER_AT, once: true },
         onComplete() {
-          self.kill();
-          self.revert();
-          if (marker) el.dataset.mark = "on";
+          if (!opts.keep) {
+            self.kill();
+            self.revert();
+          }
+          opts.done?.();
         },
-      };
-      if (kind === "wipe") {
-        // The clip reaches past each line's box so ascenders and descenders are never cut.
-        return gsap.fromTo(
-          targets,
-          { clipPath: "inset(-15% 100% -25% 0%)", x: -28 },
-          { clipPath: "inset(-15% 0% -25% 0%)", x: 0, duration: DURATION.heading + 0.15, stagger: STAGGER.lines + 0.03, ...timing },
-        );
-      }
-      if (kind === "lede") {
-        // Reading text: a shorter rise and a slower stagger, so each line can be read as it lands.
-        return gsap.from(targets, { yPercent: 70, autoAlpha: 0, duration: DURATION.text + 0.25, stagger: 0.14, ...timing });
-      }
-      if (kind === "words") return gsap.from(targets, { yPercent: 130, duration: DURATION.heading, stagger: STAGGER.words, ...timing });
-      return gsap.from(targets, {
-        yPercent: 130,
-        rotate: 2.5,
-        transformOrigin: "0% 100%",
-        duration: DURATION.heading,
-        stagger: STAGGER.lines,
-        ...timing,
       });
+      build(self, tl);
+      return tl;
     },
   });
   return () => instance.revert();
+}
+
+/** A chapter mark: the number and name rise out of their masks as the rule draws out between them. */
+function index(el: HTMLElement, delay: number) {
+  const words = el.querySelectorAll(".chapter-num > span, .chapter-name > span");
+  const rule = el.querySelector(".chapter-rule");
+  gsap
+    .timeline({ delay, scrollTrigger: { trigger: el, start: "top 90%", once: true } })
+    .from(words, { yPercent: 110, duration: DURATION.label, ease: EASE.enter, stagger: 0.12, clearProps: "transform" }, 0)
+    .fromTo(rule, { scaleX: 0 }, { scaleX: 1, duration: DURATION.label + 0.2, ease: EASE.move, clearProps: "transform" }, 0.05);
+}
+
+/**
+ * Curiosity's statement. Its lines travel less than other headings (two
+ * thirds of a line, clearing as they come) and the motion carries straight on
+ * into its last word: "questions." turns ultramarine as the last line lands,
+ * the split hands back plain text the moment that line is settled (the masks
+ * would cut the thread), and the thread is drawn under the word.
+ */
+const QUESTION = { rise: 65, duration: 1.1, stagger: 0.12 };
+function question(el: HTMLElement, delay: number) {
+  if (!el.querySelector(".em")) return BUILD.rise(el, delay);
+  el.dataset.mark = "pending";
+  let drawing: gsap.core.Tween | null = null;
+  const instance = SplitText.create(el, {
+    type: "lines",
+    mask: "lines",
+    linesClass: "split-line",
+    aria: ariaFor(el),
+    ignore: ".em-loop",
+    autoSplit: true,
+    onSplit(self) {
+      const lastStart = QUESTION.stagger * (self.lines.length - 1);
+      return (
+        gsap
+          .timeline({ delay, defaults: { ease: EASE.enter }, scrollTrigger: { trigger: el, start: ENTER_AT, once: true } })
+          .from(self.lines, { yPercent: QUESTION.rise, autoAlpha: 0, duration: QUESTION.duration, stagger: QUESTION.stagger })
+          .call(() => void (el.dataset.mark = "on"), [], lastStart + 0.22)
+          // Halfway through its tween, expo.out has the last line within about a pixel of its place.
+          .call(
+            () => {
+              self.kill();
+              self.revert();
+              const path = el.querySelector(".em-loop path");
+              if (path) drawing = gsap.fromTo(path, { strokeDashoffset: 1 }, { strokeDashoffset: 0, duration: 1.1, ease: "sine.inOut" });
+            },
+            [],
+            lastStart + QUESTION.duration * 0.5,
+          )
+      );
+    },
+  });
+  return () => {
+    drawing?.revert();
+    instance.revert();
+  };
+}
+
+/**
+ * "Every difficult problem has a starting point." Its lines rise as the
+ * section opens; after that the words stay split and fill from slate to ink
+ * as the heading travels up the screen, the last two ("starting point.") to
+ * ultramarine, so reading down to the first stage finishes the sentence.
+ * Scrolling back drains it again. Without motion it is simply set in its
+ * final colours.
+ */
+function progress(el: HTMLElement, delay: number) {
+  let fill: gsap.core.Tween | null = null;
+  const instance = SplitText.create(el, {
+    type: "lines,words",
+    mask: "lines",
+    linesClass: "split-line",
+    wordsClass: "split-word",
+    aria: ariaFor(el),
+    autoSplit: true,
+    onSplit(self) {
+      fill?.revert();
+      fill = gsap.from(self.words, {
+        color: token("--muted"),
+        ease: EASE.scroll,
+        stagger: 0.5,
+        scrollTrigger: { trigger: el, start: "top 80%", end: "bottom 48%", scrub: true },
+      });
+      return gsap.from(self.lines, {
+        yPercent: 105,
+        duration: DURATION.line,
+        ease: EASE.enter,
+        stagger: STAGGER.lines,
+        delay,
+        scrollTrigger: { trigger: el, start: ENTER_AT, once: true },
+      });
+    },
+  });
+  return () => {
+    fill?.revert();
+    instance.revert();
+  };
+}
+
+/**
+ * "Strong foundations. Room to grow." Two sentences, two arrivals: the first
+ * rises by whole lines, the second a beat later word by word inside its own
+ * line, so the two blocks come into alignment rather than arriving as one.
+ * The second sentence's words then ease apart with the scroll (scenes.ts).
+ */
+function phrases(el: HTMLElement, delay: number) {
+  return entrance(el, { type: "lines,words", mask: "lines" }, delay, (self, tl) => {
+    const second = self.words.filter((word) => word.closest(".grow-word"));
+    const first = self.lines.filter((line) => !line.querySelector(".grow-word"));
+    if (!second.length || !first.length) {
+      tl.from(self.lines, { yPercent: 105, duration: DURATION.line, stagger: STAGGER.lines });
+      return;
+    }
+    tl.from(first, { yPercent: 105, duration: DURATION.line, stagger: STAGGER.lines + 0.02 }, 0).from(
+      second,
+      { yPercent: 110, duration: DURATION.line - 0.1, stagger: 0.09 },
+      0.32 + (first.length - 1) * (STAGGER.lines + 0.02),
+    );
+  });
+}
+
+/**
+ * Contact, the last beat. The opening lines rise together; the last line
+ * follows later and slower, and its tinted word ("conversation.") turns from
+ * white to citron as it settles, as the ribbon's loop closes beside it.
+ */
+function finale(el: HTMLElement, delay: number) {
+  if (el.querySelector(".tint")) el.dataset.mark = "pending";
+  return entrance(
+    el,
+    { type: "lines", mask: "lines" },
+    delay,
+    (self, tl) => {
+      const lines = self.lines;
+      const last = lines[lines.length - 1];
+      const rest = lines.slice(0, -1);
+      if (rest.length) tl.from(rest, { yPercent: 105, duration: DURATION.line - 0.1, stagger: STAGGER.lines - 0.02 }, 0);
+      tl.from(last, { yPercent: 105, duration: DURATION.heading + 0.35 }, rest.length ? 0.38 + rest.length * 0.05 : 0).call(
+        () => {
+          el.dataset.mark = "on";
+        },
+        [],
+        "-=0.9",
+      );
+    },
+    { start: "top 80%" },
+  );
+}
+
+/**
+ * Reading text: the paragraph's lines in two or three groups, each rising a
+ * little (about a third of a line) and clearing as it comes, a short beat apart.
+ */
+function lede(el: HTMLElement, delay: number) {
+  const rise = parseFloat(getComputedStyle(el).fontSize) * 0.55;
+  return entrance(el, { type: "lines" }, delay, (self, tl) => {
+    lineGroups(self.lines).forEach((group, i) => {
+      tl.from(group, { y: rise, autoAlpha: 0, duration: DURATION.read, ease: EASE.read }, i * STAGGER.groups);
+    });
+  });
 }
 
 function fade(el: HTMLElement, delay: number) {
   const targets = el.hasAttribute("data-reveal-children") ? Array.from(el.children) : el;
   gsap.from(targets, {
     autoAlpha: 0,
-    y: 26,
-    duration: DURATION.text,
-    ease: EASE.enter,
+    y: 16,
+    duration: DURATION.read,
+    ease: EASE.read,
     delay,
     stagger: STAGGER.items,
     clearProps: "all",
@@ -109,72 +293,96 @@ function fade(el: HTMLElement, delay: number) {
 }
 
 /**
- * A learning stage reaching the reading position: its number comes into focus
- * on the rail, its title rises out of a mask, then its sentence follows. The
- * stage's state (current, done) is separate and reversible (stages.ts).
+ * A learning stage nearing the reading line: its number wipes up inside its
+ * ring, its title rises word by word, then its sentence follows in one calm
+ * step. Split only when it plays (short text, gone again a second later).
+ * The stage's state (current, done) is separate and reversible (stages.ts), on
+ * the same line the ribbon uses, so the words, rail and form always agree.
  */
 function stage(el: HTMLElement) {
   const num = el.querySelector(".stage-num");
   const title = el.querySelector<HTMLElement>(".t-stage");
-  const body = el.querySelector(".stage-body");
-  if (!title) return () => {};
-  const instance = SplitText.create(title, {
-    type: "lines",
-    mask: "lines",
-    linesClass: "split-line",
-    aria: ariaFor(title),
-    autoSplit: true,
-    onSplit(self) {
+  const body = el.querySelector<HTMLElement>(".stage-body");
+  if (!title || !body) return;
+  const splits: SplitText[] = [];
+  gsap.set([title, body], { autoAlpha: 0 });
+  if (num) gsap.set(num, { clipPath: "inset(100% 0% 0% 0% round 999px)" });
+  ScrollTrigger.create({
+    trigger: el,
+    start: "top 76%",
+    once: true,
+    onEnter() {
+      const words = SplitText.create(title, { type: "words", mask: "words", wordsClass: "split-word", aria: ariaFor(title) });
+      const lines = SplitText.create(body, { type: "lines", linesClass: "split-line", aria: "none" });
+      splits.push(words, lines);
       const tl = gsap.timeline({
         defaults: { ease: EASE.enter },
-        scrollTrigger: { trigger: el, start: "top 88%", once: true },
         onComplete() {
-          self.kill();
-          self.revert();
+          words.revert();
+          lines.revert();
         },
       });
-      if (num) tl.from(num, { scale: 0.6, autoAlpha: 0, duration: 0.8, clearProps: "transform,opacity,visibility" }, 0);
-      tl.from(self.lines, { yPercent: 130, duration: DURATION.heading, stagger: STAGGER.lines }, 0.06);
-      if (body) tl.from(body, { autoAlpha: 0, y: 16, duration: DURATION.text, clearProps: "all" }, 0.18);
-      return tl;
+      if (num) tl.to(num, { clipPath: "inset(0% 0% 0% 0% round 999px)", duration: 0.6, ease: EASE.read, clearProps: "clipPath" }, 0);
+      tl.set([title, body], { autoAlpha: 1 }, 0)
+        .from(words.words, { yPercent: 110, duration: DURATION.line - 0.15, stagger: 0.07 }, 0.12)
+        .from(lines.lines, { y: 12, autoAlpha: 0, duration: DURATION.read, ease: EASE.read, stagger: 0.06 }, 0.34);
     },
   });
-  return () => instance.revert();
+  return () => splits.forEach((split) => split.revert());
 }
 
 /**
- * Each item draws its rule across, then its words arrive. A list marked
- * data-reveal-turns (Foundations) is slower and lifts the coil's matching turn
- * as each course arrives, so the four turns read as the four courses.
+ * Each item's knot appears, its rule draws out of it, its label rises from a
+ * mask and its details follow. A list marked data-reveal-turns (Foundations)
+ * is slower and lifts the coil's matching turn as each course arrives, so the
+ * four turns read as the four courses. Lists added later in site.ts
+ * (certificates, experience) get the same entrance without new code.
  */
 function ruled(list: HTMLElement) {
   const items = Array.from(list.children) as HTMLElement[];
   const turns = list.hasAttribute("data-reveal-turns");
   const gap = turns ? 0.3 : 0.14;
+  // The item's label (its h3) and everything else that follows it in, label excluded.
+  const parts = (item: HTMLElement) => {
+    const label = item.querySelector<HTMLElement>("h3");
+    const rest: Element[] = [];
+    for (const child of Array.from(item.children)) {
+      if (child === label || child.matches(".rule, .rule-knot")) continue;
+      if (label && child.contains(label)) rest.push(...Array.from(child.children).filter((el) => el !== label));
+      else rest.push(child);
+    }
+    return { label, rest };
+  };
   ScrollTrigger.batch(items, {
     start: "top 88%",
     once: true,
     onEnter(batch) {
-      batch.forEach((item, i) => {
+      batch.forEach((element, i) => {
+        const item = element as HTMLElement;
+        const { label, rest } = parts(item);
+        const split = label ? SplitText.create(label, { type: "lines", mask: "lines", linesClass: "split-line", aria: ariaFor(label) }) : null;
         const tl = gsap
-          .timeline({ delay: i * gap })
-          .fromTo(item.querySelector(".rule"), { scaleX: 0 }, { scaleX: 1, duration: 1.1, ease: EASE.move, clearProps: "transform" })
-          .fromTo(
-            item.querySelectorAll(":scope > :not(.rule)"),
-            { autoAlpha: 0, y: 18 },
-            { autoAlpha: 1, y: 0, duration: DURATION.text, ease: EASE.enter, stagger: 0.07, clearProps: "all" },
-            0.25,
-          );
+          .timeline({ delay: i * gap, onComplete: () => split?.revert() })
+          .fromTo(item.querySelector(".rule-knot"), { scale: 0 }, { scale: 1, duration: 0.4, ease: EASE.read, clearProps: "transform" }, 0)
+          .fromTo(item.querySelector(".rule"), { scaleX: 0 }, { scaleX: 1, duration: 1.1, ease: EASE.move, clearProps: "transform" }, 0.08);
+        if (label && split) {
+          tl.set(label, { autoAlpha: 1 }, 0.3).from(split.lines, { yPercent: 105, duration: DURATION.line - 0.1, ease: EASE.enter, stagger: STAGGER.lines }, 0.3);
+        }
+        tl.fromTo(rest, { autoAlpha: 0, y: 10 }, { autoAlpha: 1, y: 0, duration: DURATION.read, ease: EASE.read, stagger: 0.07, clearProps: "all" }, 0.45);
         if (turns) {
-          const turn = items.indexOf(item as HTMLElement);
+          const turn = items.indexOf(item);
           tl.call(() => lift(turn), [], 0.3).call(() => release(turn), [], 0.3 + gap + 0.25);
         }
       });
     },
   });
   // Start hidden only once the batch exists; anything already passed plays at once.
-  gsap.set(list.querySelectorAll(":scope > * > .rule"), { scaleX: 0 });
-  gsap.set(list.querySelectorAll(":scope > * > :not(.rule)"), { autoAlpha: 0 });
+  for (const item of items) {
+    const { label, rest } = parts(item);
+    gsap.set(item.querySelector(".rule"), { scaleX: 0 });
+    gsap.set(item.querySelector(".rule-knot"), { scale: 0 });
+    gsap.set([label, ...rest].filter(Boolean), { autoAlpha: 0 });
+  }
 }
 
 /** Lifts a turn of the coil for the entrance, unless the visitor is pointing at a course. */

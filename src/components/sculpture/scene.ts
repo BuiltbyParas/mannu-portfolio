@@ -22,6 +22,7 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { CLEAR_MAX, CLEARANCE_GLSL } from "./clearance";
 import { absorbGlow, depthFade, emergeWeight, gatherWeight, passageOpacity, seedDust, streakAt, swirlAngle, travelAt, travelZ } from "./passage";
 import type { Strip } from "./strip";
+import { createWorld, type WorldState } from "./world";
 
 /*
  * The renderer for the ribbon: one mesh, one draw call, a studio environment
@@ -31,7 +32,10 @@ import type { Strip } from "./strip";
  * Curiosity; see passage.ts. The caller decides when to render; nothing here
  * runs a loop of its own.
  *
- * All three materials share one clearance mask (clearance.ts): the boxes of
+ * On large screens the opening also has a world of glass spheres (world.ts),
+ * drawn only while the opening's stage is in use.
+ *
+ * All the materials share one clearance mask (clearance.ts): the boxes of
  * the words on screen, where nothing of the scene is drawn.
  */
 
@@ -125,7 +129,11 @@ function withClearance<M extends MeshPhysicalMaterial | ShadowMaterial>(material
   return material;
 }
 
-export function createRibbonScene(canvas: HTMLCanvasElement, samples: number, { shadows, dustCount }: { shadows: boolean; dustCount: number }) {
+export function createRibbonScene(
+  canvas: HTMLCanvasElement,
+  samples: number,
+  { shadows, dustCount }: { shadows: boolean; dustCount: number },
+) {
   const renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: "high-performance" });
   renderer.setClearColor(0x000000, 0);
   renderer.outputColorSpace = SRGBColorSpace;
@@ -204,6 +212,8 @@ export function createRibbonScene(canvas: HTMLCanvasElement, samples: number, { 
   scene.add(mesh);
 
   const shadowMaterial = withClearance(new ShadowMaterial({ color: 0x1c2a78, opacity: 0.09 }), clear, "#include <premultiplied_alpha_fragment>");
+  // The catcher only receives the shadow; it must not hide the opening's glass that sits behind it.
+  shadowMaterial.depthWrite = false;
   const plane = new Mesh(new PlaneGeometry(1, 1), shadowMaterial);
   plane.position.z = -1.15;
   plane.receiveShadow = true;
@@ -238,6 +248,9 @@ export function createRibbonScene(canvas: HTMLCanvasElement, samples: number, { 
   scene.add(dust);
   const onStrip = new Vector3();
 
+  const world = createWorld(clear);
+  scene.add(world.root);
+
   let pixelsPerUnit = 1;
   let pixelRatio = 1;
   let viewW = 1;
@@ -255,6 +268,7 @@ export function createRibbonScene(canvas: HTMLCanvasElement, samples: number, { 
     dustMaterial.uniforms.uScale.value = pixelsPerUnit * CAMERA_Z * pixelRatio;
     // The plane sits behind the strip, so it must be a little larger than the view.
     plane.scale.set(viewW * 1.4, viewH * 1.4, 1);
+    world.resize(camera.aspect);
     if (shadows) {
       const cam = key.shadow.camera;
       cam.left = -viewW * 0.7;
@@ -396,6 +410,12 @@ export function createRibbonScene(canvas: HTMLCanvasElement, samples: number, { 
     clear.uClearSoft.value = soft * pixelRatio;
   }
 
+  /** Places the opening's world for this frame, or hides it (null) wherever the opening's stage is not in use. */
+  function updateWorld(state: WorldState | null) {
+    if (state) world.update(state);
+    else world.hide();
+  }
+
   function render() {
     renderer.render(scene, camera);
   }
@@ -407,10 +427,26 @@ export function createRibbonScene(canvas: HTMLCanvasElement, samples: number, { 
     shadowMaterial.dispose();
     dustGeometry.dispose();
     dustMaterial.dispose();
+    world.dispose();
     envTarget.dispose();
     renderer.dispose();
     renderer.forceContextLoss();
   }
 
-  return { resize, toWorld, update, updateDust, setClearance, render, dispose, get pixelsPerUnit() { return pixelsPerUnit; }, get pixelRatio() { return pixelRatio; } };
+  return {
+    resize,
+    toWorld,
+    update,
+    updateDust,
+    updateWorld,
+    setClearance,
+    render,
+    dispose,
+    get pixelsPerUnit() {
+      return pixelsPerUnit;
+    },
+    get pixelRatio() {
+      return pixelRatio;
+    },
+  };
 }

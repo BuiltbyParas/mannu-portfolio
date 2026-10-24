@@ -1,4 +1,5 @@
 import { ScrollTrigger } from "@/lib/gsap";
+import { stageScroll } from "@/lib/stage";
 
 /*
  * The trail: a hairline in the right margin that is drawn as the page is read,
@@ -26,7 +27,9 @@ export function setupTrail() {
     const header = document.getElementById("site-header")?.offsetHeight ?? 0;
     marks = knots.map((knot) => {
       const section = knot.dataset.for ? document.getElementById(knot.dataset.for) : null;
-      const at = section ? Math.min(1, Math.max(0, (section.getBoundingClientRect().top + window.scrollY - header) / max)) : 0;
+      // A chapter on the opening's stage arrives at its moment on the stage, not where its box happens to be.
+      const top = section ? (stageScroll(section) ?? section.getBoundingClientRect().top + window.scrollY - header) : 0;
+      const at = Math.min(1, Math.max(0, top / max));
       knot.style.top = `${at * 100}%`;
       return at;
     });

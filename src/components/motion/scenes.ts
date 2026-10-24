@@ -1,5 +1,6 @@
 import { gsap } from "@/lib/gsap";
 import { EASE } from "@/lib/motion";
+import { stageScroll } from "@/lib/stage";
 
 /*
  * Scenery tied to the scroll position: all scrubbed, so scrolling back plays
@@ -19,12 +20,16 @@ import { EASE } from "@/lib/motion";
  *   Experience           the heading drifts against the long strand under it
  *                        (parallax, 2 of 3; the passage's depth is the third)
  *   "Room to grow."      the words of the line ease apart as the heading rises
+ *
+ * Where the opening's stage is in use (`stage`, large screens), the opening's
+ * exit, the passage and the dome at the end of Curiosity belong to the stage
+ * instead (opening.ts).
  */
-export function setupScenes() {
+export function setupScenes(stage = false) {
   const tweens: (gsap.core.Tween | gsap.core.Timeline)[] = [];
   const scrub = (trigger: Element | string, start: string, end: string) => ({ trigger, start, end, scrub: true, invalidateOnRefresh: true });
 
-  const hero = document.getElementById("top");
+  const hero = stage ? null : document.getElementById("top");
   if (hero) {
     tweens.push(
       gsap
@@ -37,9 +42,12 @@ export function setupScenes() {
   const cue = document.querySelector(".hero-cue-inner");
   const trail = document.querySelector(".trail");
   if (cue || trail) {
+    // From where the name is at rest: the top of the page, or past the landing on large screens.
+    const opening = document.getElementById("top");
+    const from = () => (opening ? (stageScroll(opening) ?? opening.getBoundingClientRect().top + window.scrollY) : 0);
     const tl = gsap.timeline({
       defaults: { ease: EASE.scroll },
-      scrollTrigger: { start: 0, end: () => window.innerHeight * 0.5, scrub: true, invalidateOnRefresh: true },
+      scrollTrigger: { start: from, end: () => from() + window.innerHeight * 0.5, scrub: true, invalidateOnRefresh: true },
     });
     if (cue) {
       tl.fromTo(cue.querySelector(".hero-cue-fill"), { scaleY: 0 }, { scaleY: 1, duration: 0.6 }, 0)
@@ -52,7 +60,7 @@ export function setupScenes() {
     tweens.push(tl);
   }
 
-  const passage = document.querySelector(".curiosity-passage");
+  const passage = stage ? null : document.querySelector(".curiosity-passage");
   const veil = document.querySelector(".passage-veil");
   if (passage && veil) {
     tweens.push(
@@ -65,7 +73,7 @@ export function setupScenes() {
 
   for (const rise of Array.from(document.querySelectorAll<HTMLElement>(".rise"))) {
     const section = rise.parentElement;
-    if (!section) continue;
+    if (!section || (stage && rise.closest(".opening"))) continue;
     tweens.push(gsap.fromTo(rise, { scaleY: 1 }, { scaleY: 0, ease: EASE.scroll, scrollTrigger: scrub(section, "bottom bottom", "bottom 38%") }));
   }
 

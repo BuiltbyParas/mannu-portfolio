@@ -92,14 +92,21 @@ as kindergarten rather than reasoning), and a node network (the old site’s con
 
 ## 5. Layout map (desktop 1440 / phone 390)
 
-1. **Opening (`#top`, paper).** Context line top-left. The name spans the full width; its letters
-   alternate above and below the ribbon layer, so the ribbon weaves over and under them and ties
-   a loop around the final “u”. Below: tagline (display, two lines) at left; introduction and the
-   two actions at right. Phone: context, name at full width, tagline, introduction, actions,
-   all inside the first screen.
+1. **Opening (`#top`).** Desktop (1024 px and up, since the October 2026 hero pass, §10): a
+   landing scene. A sky with a horizon (pearl warming to a bright horizon with a blush glow,
+   powder haze high on the left, a cooler ground), the world around the ribbon (glass at three
+   depths, motes, two orbits around the loop) and the cue in the right margin where the trail will
+   run. The name, its label `BCA STUDENT · LOVELY PROFESSIONAL UNIVERSITY` (just above the
+   name's first letter) and the ribbon weaving through the letters (alternately over and under
+   them, its loop rising above the name) are the landing's (§11); the stage keeps them in the
+   page for assistive technology only. There is no tagline and there are no actions in the
+   opening, and the introduction paragraph is not repeated here (the label already says who and
+   where; Curiosity carries the rest). Tablet and phone, unchanged apart from that: context, name
+   at full width, introduction, all inside the first screen.
 2. **Curiosity (`#about`, powder field).** Statement heading across nine columns; the ribbon
    wanders in a wide clearing at lower left and leans toward the pointer; the two paragraphs sit
-   in a narrow column at lower right. Phone: heading, ribbon clearing, paragraphs.
+   in a narrow column at lower right. Desktop with motion: the same composition fitted into one
+   viewport on the opening's stage (§10). Phone: heading, ribbon clearing, paragraphs.
 3. **How I learn (`#how-i-learn`, paper).** Heading with the introduction stacked under it. Then
    four stages scrolling in the right-hand column beside one sticky box on the left, where the
    ribbon transforms in place (numeral, title, line per stage). The stage on the reading line is
@@ -142,7 +149,10 @@ re-threading itself). The same functions draw the static SVG fallback on the ser
 ## 7. Fallbacks, accessibility, performance
 
 - No JavaScript, no WebGL, or `prefers-reduced-motion`: each slot shows the same state as a still
-  SVG drawn from the same form functions; no canvas is created and Lenis never starts.
+  SVG drawn from the same form functions; no canvas is created and Lenis never starts. On desktop
+  the opening keeps its sky (CSS) and its world as a still (`WorldSVG.tsx`, drawn from
+  `scenery.ts`), and Curiosity follows it in the page; without WebGL but with motion the stage
+  still holds and the two ribbon stills cross over as the ribbon would change.
 - Three.js loads lazily after first paint; one draw call for the ribbon (one geometry, vertex colours, one
   physical material), one shadow-catcher plane on desktop only, pixel ratio capped (1.75 desktop,
   1.5 phone), fewer samples on phones, rendering paused when the tab is hidden or nothing changes.
@@ -173,12 +183,14 @@ motion idea and at most one supporting one, with pauses where the composition ca
 
 **Narrative moments**
 
+On desktop, moments 1 and 2 below are replaced, after the load sequence, by the opening's stage
+(§10); tablets and phones keep them as written.
+
 1. *Opening* (`motion/intro.ts`, under 3 s, never blocks scrolling). Header settles; context line
    rises from its mask; the ribbon threads in from the left (`threadSignals.reveal`, driven by the
    opening's timeline) and each letter of the name rises exactly as the ribbon's tip reaches it
    (start times come from the `hero` form's geometry, the measured glyph positions and the
-   inverted ribbon ease); the loop ties above the last letter; tagline line by line; introduction;
-   the two actions last; then the cue. The name waits for the 3D scene at most 0.65 s
+   inverted ribbon ease); the loop ties above the last letter; introduction; then the cue. The name waits for the 3D scene at most 0.65 s
    (`THREAD_READY`), so a slow device or no WebGL costs a fraction of a second. CSS failsafe as
    before. As the page leaves the opening, the name and context line rise faster than the page
    (parallax 1 of 3; the hero slot is `live`, so the ribbon follows the name), and the cue's line
@@ -205,21 +217,34 @@ motion idea and at most one supporting one, with pauses where the composition ca
    citron, white, ultramarine), replacing the hard bands and the old inset field reveal.
    Experience's heading drifts against its strand (parallax 3 of 3).
 
-**Section beats** (`motion/reveals.ts`, declared in markup, built in page order): Curiosity rises
-word by word, then a thread is drawn under its last word and ties a loop hanging below it; its lede
-arrives line by line, the rest later. Foundations' heading rises by lines and "Room to grow." eases
-apart as it rises (`--grow`, scrubbed); each course draws its rule, then its words, and lifts its
-own turn of the coil as it arrives. Certificates keep the 45-mark tally (now tipping slightly
-toward the pointer for depth, marks still turning aside near it); real certificate rows draw their
-rules and take a hover/focus rule. Experience uncovers left to right; real entries draw their rules.
-Contact rises by lines, then rests.
+**Section beats** (`motion/reveals.ts`, declared in markup, built in page order; typography pass,
+October 2026). Every section's text has a deliberate treatment, but they differ by role, so the
+page never reads as one preset:
+
+| Element | Treatment | Trigger | Timing | Why |
+| --- | --- | --- | --- | --- |
+| Hero name | characters rise as the ribbon tip reaches each (unchanged, 3° lean) | opening timeline | 1.3 s `expo.out`, started from ribbon geometry | the one place letters move |
+| Hero introduction | two or three groups of lines, small rise + clear | +0.3 s after the name | 0.75 s `power3.out`, 160 ms between groups | readable, never typed out |
+| Chapter marks (01–06) | rule draws, number and name rise from masks | `top 90%` | 0.7 s / 0.9 s | an index that leads the heading: label, heading, text |
+| Curiosity statement | lines lift 65 % through masks while clearing, then run straight on: "questions." turns ultramarine, the split reverts and the thread draws | `top 84%` | 1.1 s lines, 120 ms stagger; colour at +0.46 s; thread from +0.79 s, 1.1 s `sine.inOut` | one continuous gesture, not two effects |
+| How I learn heading | lines rise from masks; words then fill slate → ink with the scroll, "starting point." → ultramarine | entrance `top 84%`; fill scrubbed `top 80%`→`bottom 48%` | scrub = scroll | the one scroll-linked statement; drains back on scroll up |
+| Stages | number wipes up inside its ring, title rises word by word, sentence follows in one calm step | `top 76%` | 0.6 s / 0.85 s, 70 ms / 0.75 s | state (current/done, rail, ribbon form) stays on the shared centre line |
+| Foundations heading | "Strong foundations." rises by lines; "Room to grow." a beat later word by word inside its line, then eases apart with the scroll (`--grow`) | `top 84%` | 1.0 s, words 90 ms | two blocks moving into alignment |
+| Courses (and future certificate / experience rows) | knot appears, rule draws out of it, label rises from a mask, details follow; the course's turn of the coil lifts | batch `top 88%` | knot 0.4 s, rule 1.1 s, label 0.9 s | reading order: rule, label, coil |
+| Certificates heading | plain masked line rise | `top 84%` | 1.0 s, 90 ms | the ledger carries the moment: its 45 marks now arrive in five row waves (`forms.ts` `order`) |
+| Experience heading | left-to-right wipe (clip widened so descenders and the full stop are never cut) | `top 84%` | 1.3 s | follows the strand's direction |
+| Contact heading | opening lines rise together, the last line later and slower, "conversation." settles into citron | `top 80%` | 0.9 s, last line 1.5 s | the final beat, resolving with the loop |
+| Paragraphs (all sections) | the same line-group reveal as the hero introduction, delayed so the eye moves down | `top 84%` + delay | 0.75 s | calm, readable |
 
 **Typography rules**: SplitText with `autoSplit` + `onSplit` (re-splits on font load and resize,
-animation returned for clean-up), reverted to plain text after each entrance. Headings use
-`aria: "auto"` (labelled heading, hidden pieces); paragraphs use `aria: "none"` (split into lines
-or words, never characters, so they read as whole words). Masks carry `.split-line-mask` /
-`.split-word-mask` room below for descenders (bottom-only, so stacked masks cannot add height);
-measured: every glyph clears its mask at 1440, 820 and 390. Characters move only in the opening.
+animation returned for clean-up), reverted to plain text after each entrance; only How I learn's
+heading stays split while its fill is scroll-linked. Use the least granular split: lines for
+headings and paragraphs, stage titles and "Room to grow.", characters
+only for the name. Headings use `aria: "auto"` (labelled heading, hidden pieces); paragraphs use
+`aria: "none"` (lines, never characters, so they read as whole words). Masks carry
+`.split-line-mask` / `.split-word-mask` room below for descenders (bottom-only, so stacked masks
+cannot add height). Resting colours (`.em`, `.tint`) are the CSS default, so reduced motion and
+no-script show the final state; motion only holds them at `data-mark="pending"` until they land.
 
 **Micro-interactions** (CSS): pills (`PillLabel.tsx`) set their label on both faces; hover turns
 the other face up behind a domed mask, its words surfacing with it, so the label reads whole at
@@ -250,3 +275,98 @@ Figma limits to a small monthly number of MCP calls). Used for: colour and spaci
 styles, and four reference frames (desktop and phone opening; desktop learning sequence and
 contact). The 3D ribbon cannot exist as native layers; frames show its silhouette as a flat
 two-tone vector.
+
+## 10. The opening's stage (desktop hero → introduction, October 2026)
+
+Made from `Mannu_Organimo_Inspired_Hero_Introduction_Prompt.md`, after inspecting organimo.com in a
+real browser (opening and the scroll states after it). What was taken is the experience pattern,
+not anything visible: a full-bleed real-time scene with the statement layered into it, forms at
+several depths around one focal object, and a first scroll that moves the view *through* the
+scene while the words change in place, instead of the page sliding the next block up. Organimo's
+sea, rocks, objects, copy and layout are not used; the world here is original and procedural.
+
+**Structure.** `sections/Opening.tsx` wraps the opening and Curiosity in one stage. With motion,
+at 1024 px wide and 600 px tall and up (`STAGE` in `src/lib/stage.ts`, mirrored in
+`globals.css`), the stage is sticky inside a wrapper one viewport plus `--opening-run` (100vh)
+tall (`--rest-run` is 0: the landing's name has already gone, so a rest would show an empty sky):
+it holds for one viewport of ordinary, native scrolling, then is released and
+"How I learn" follows. Above it, the desktop landing (§11) scrolls away as an ordinary section. Both sections lie on it, one over the other. The ribbon's canvas is
+rendered inside the stage, because a sticky box is a layer of its own and the name's letters
+must still pass over and under the ribbon; being fixed, the canvas covers the view the same way
+wherever it sits. Nothing else is pinned; the landing above has its own small canvas (§11).
+
+**One progress value.** A ScrollTrigger on the wrapper measures the stuck stretch (again after
+fonts and on every resize); `motion/opening.ts` eases it once (≈ 110 ms) into `p ∈ [0, 1]`,
+applies it to one paused timeline for the words, the sky and the stills, and publishes it as
+`threadSignals.opening`, which the ribbon controller and the world read on the same frame. The
+beats live in `sculpture/scenery.ts` (`OPENING`) and are unit-tested:
+
+| p | What happens |
+| --- | --- |
+| 0 | The stage has just stuck; the ribbon, carried off the landing's name as the stage rose (`carried()` in the controller: it drifts to the middle of the view instead of scrolling away), is already crossing the sky |
+| 0–0.72 | The view travels: the world comes toward the viewer, slides and turns (`cameraAt`); near glass passes out of frame, far glass grows into place above the writing; the CSS sky swells toward its horizon |
+| 0–0.60 | The sky turns from pearl and blush to Curiosity's powder in one broad cross-fade (no band edge) |
+| 0–0.60 | The ribbon changes from the opening's form to Curiosity's (the existing state system and its re-threading stagger), from mid-view to the lower-left clearing |
+| 0.30–0.50 | Curiosity's label (rule, number, name), then the statement line by line out of masks |
+| 0.48–0.58 | "questions." turns ultramarine and its thread is drawn |
+| 0.42–0.70 | The lede, then the paragraph, each in two or three groups of lines (never letters) |
+| 0.84–1 | Settled; the paper of "How I learn" swells into the bottom of the stage, then flattens as the stage leaves |
+
+Links to `#about` (the hero's first action, the nav, the menu, an address with the hash) land on
+`p = 0.76`, links to `#top` on `p = 0`; the header names the opening, then About, from `p = 0.3`,
+shows its small wordmark once the name has gone, and turns into its solid bar only when the stage
+is released. The layer whose words are out of play is `data-dormant` (no pointer, no clearance).
+
+**The world** (`sculpture/world.ts`, layout in `scenery.ts`): three clear glass spheres (a
+thin-film rim from powder through blush, a crisp highlight, a soft caustic; no textures). Six
+extra draw calls, only while the stage is on screen, all inside the clearance mask and clipped to
+the stage's lower edge as it leaves; while the stage is still rising into view under the landing
+the world rises with it (the stage's own box gives the shift), and while the stage is wholly below
+the landing the ribbon's canvas draws nothing. On the stage the glass carries the travel, so the
+passage's point field (`passage.ts`) is kept for small screens only. Measured on the laptop AMD GPU at 1440×900: 60 fps average through the stage,
+p95 frame 16.7 ms.
+
+## 11. The landing (desktop hero, October 2026)
+
+Made from `Mannu_Landing_Step_1_Abstract_Hero.md` (step 1 of 3), in the chosen Lumina-inspired
+direction: one full view before the opening, of original abstract liquid glass on a light field,
+with the name set as HTML in front of it, its label just above, and a quiet "Scroll to explore" cue. It
+replaces the earlier bubble landing and its fly-through. Steps 2 (changing slides) and 3 (the scene
+turning into the ribbon on scroll) are not built: the visitor simply scrolls from the landing into
+the opening, which sits directly below it in the page.
+
+**Structure.** `sections/Landing.tsx` is an ordinary section before `sections/Opening.tsx`, at
+1024 px and up only (small screens open on the name as before). It lies over the opening's stage
+and the ribbon's fixed canvas (z-index, opaque paper), and its lower edge reflects the top of the
+opening's sky into itself and fades out (`.landing::after`, sharing `--sky-horizon` with
+`.sky-landing`), so the two meet without a seam as the stage rises into view. Its words repeat the
+opening's h1 and label, which follow at once, so the landing is `aria-hidden`.
+
+**The scene** (`components/glass`): its own small Three.js renderer, on the same `three` chunk the
+ribbon loads, started after hydration and only where the landing shows. The ground is one quad
+painting the field: a pearl-to-pale base, soft pools (powder, an ultramarine pool behind the large
+form, a citron glow behind the near drop, a white source where the name stands) and two faint bands
+of light. Five forms of glass (one large behind the name, a near drop cut by the lower-left edge, a
+pebble, a bead and a seed at other depths) are spheres whose surfaces swell slowly (simplex noise in
+the vertex shader). Each is drawn opaque: its fragment shader evaluates the same field where the
+glass bends the view (a thick lens, magnified and turned over toward the rim, the three colours bent
+slightly differently), gathers the bands more strongly than the page shows them, soaks up a little
+tint where it is thick, darkens in a ring toward the rim, and adds a pale studio's reflections (key,
+softbox, rim light, a cool horizon band that gives the edge on a light page). Six draw calls a frame,
+no textures or render targets. Composition, field and motion are data in `glass/layout.ts`
+(unit-tested) and placed by share of the view, so the composition holds on any screen shape.
+
+**Motion.** Forms settle into place as the scene fades in over the field, then drift on two unequal
+swings per axis (11–23 s periods), turn slowly and swell; the field's pools and bands wander a
+little. The words arrive with the page (`motion/intro.ts`): the label out of its mask, then the
+letters, then the cue. Scrolling away, the cue steps back first and the words lag a
+little behind the glass and fade before they reach the header (scrubbed; `setupLandingFlow` in
+`motion/opening.ts`). The name's entrance in the opening plays once the opening's top passes 30%
+of the view and steps back only when it falls below 55% on the way up.
+
+**Performance and fallbacks.** The scene draws on GSAP's ticker only while the landing is on screen
+and the tab is visible, at half rate after 12 s without input. Reduced motion draws one still frame
+(`STILL_T`). Without WebGL 2 or JavaScript, `GlassStill.tsx` (an SVG drawn from the same layout)
+is the picture; with motion, only its field shows until the scene's first frame. Measured on the
+laptop AMD GPU in headless Chromium at 1440×900: 60 fps (median and p95 frame 16.7 ms) at device
+pixel ratio 1 and 2 (the canvas is capped at 1.5).

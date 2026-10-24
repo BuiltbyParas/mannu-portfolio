@@ -14,6 +14,12 @@ export const threadSignals = {
   reveal: 1,
   /** True once the 3D scene draws; the opening waits a moment for it (see THREAD_READY). */
   ready: false,
+  /**
+   * The opening's progress through its stage on large screens (0–1, already
+   * eased toward the scroll by motion/opening.ts, which the words follow too),
+   * or -1 where the stage is not in use and the opening simply scrolls away.
+   */
+  opening: -1,
 };
 
 /** Dispatched on window when the 3D scene has drawn its first frame. */

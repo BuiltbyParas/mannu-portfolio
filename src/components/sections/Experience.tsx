@@ -1,3 +1,4 @@
+import { ChapterMark } from "@/components/ChapterMark";
 import { ExternalLink } from "@/components/ExternalLink";
 import { Slot } from "@/components/sculpture/Slot";
 import { publishExperience } from "@/content/publish";
@@ -19,10 +20,11 @@ export function Experience() {
     <section id="experience" className="section experience" aria-labelledby="experience-title" data-tone="white" tabIndex={-1}>
       <div className="wrap experience-grid">
         <div className="experience-head content">
+          <ChapterMark id="experience" />
           <h2 id="experience-title" className="t-heading" data-reveal="wipe">
             {experienceSection.heading}
           </h2>
-          <p className="t-lede experience-intro" data-reveal="fade" data-reveal-delay="0.25">
+          <p className="t-lede experience-intro" data-reveal="lede" data-reveal-delay="0.4">
             {experienceSection.intro}
           </p>
         </div>
@@ -34,6 +36,7 @@ export function Experience() {
             {entries.map((entry) => (
               <li className="timeline-entry" key={`${entry.role}-${entry.organization}`}>
                 <span className="rule entry-rule" aria-hidden="true" />
+                <span className="rule-knot" aria-hidden="true" />
                 {entry.period ? <p className="timeline-period">{entry.period}</p> : null}
                 <div className="timeline-body">
                   <h3 className="timeline-role">{entry.role}</h3>

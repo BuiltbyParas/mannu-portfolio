@@ -8,7 +8,9 @@
  * the words stay clean and the ribbon reads as tucking under the page.
  *
  * Only `.content` (and the footer) count. The opening's name is not content:
- * the ribbon weaves through its letters on purpose (see Hero.tsx).
+ * the ribbon weaves through its letters on purpose (see Hero.tsx). On the
+ * opening's stage, the layer whose words are out of play (`data-dormant`,
+ * motion/opening.ts) keeps nothing clear.
  *
  * The packing and the mask itself are pure (`packClearance`, `clearanceAt`)
  * and unit-tested; the shader in scene.ts evaluates the same expression.
@@ -22,7 +24,7 @@ const BLOCKS = ".button, p, h1, h2, h3, h4, li, figcaption, code, .stage-num";
 
 export type Box = { left: number; top: number; right: number; bottom: number; pad: number };
 
-type Block = { el: HTMLElement; button: boolean; pad: number; top: number; bottom: number };
+type Block = { el: HTMLElement; button: boolean; pad: number; top: number; bottom: number; staged: boolean };
 
 const range = typeof document === "undefined" ? null : document.createRange();
 
@@ -106,8 +108,16 @@ export function createClearance() {
         seen.add(block);
         const r = block.getBoundingClientRect();
         const size = parseFloat(getComputedStyle(block).fontSize) || 16;
-        // Large type gets a little more room than body text.
-        blocks.push({ el: block, button: block.matches(".button"), pad: Math.min(16, Math.max(5, size * 0.14)), top: r.top + scrollY, bottom: r.bottom + scrollY });
+        // Large type gets a little more room than body text. Words on the opening's stage do not move
+        // with the scroll, so their page position says nothing about whether they are on screen.
+        blocks.push({
+          el: block,
+          button: block.matches(".button"),
+          pad: Math.min(16, Math.max(5, size * 0.14)),
+          top: r.top + scrollY,
+          bottom: r.bottom + scrollY,
+          staged: block.closest(".opening-stage") !== null,
+        });
       }
     }
   }
@@ -118,8 +128,10 @@ export function createClearance() {
     const scrollY = window.scrollY;
     for (const block of blocks) {
       // Cheap cull on the cached page position first; generous, since layout may have moved a little.
-      if (block.bottom - scrollY < -margin - viewH * 0.25 || block.top - scrollY > viewH + margin + viewH * 0.25) continue;
+      if (!block.staged && (block.bottom - scrollY < -margin - viewH * 0.25 || block.top - scrollY > viewH + margin + viewH * 0.25)) continue;
+      // A layer of the stage that is out of play keeps nothing clear, nor do words it has already put away.
       if (!block.el.isConnected) continue;
+      if (block.staged && (block.el.closest("[data-dormant]") || block.el.checkVisibility?.({ visibilityProperty: true, opacityProperty: true }) === false)) continue;
       if (block.button) {
         const r = block.el.getBoundingClientRect();
         if (r.width > 0) boxes.push({ left: r.left, top: r.top, right: r.right, bottom: r.bottom, pad: block.pad });

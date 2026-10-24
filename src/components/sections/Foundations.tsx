@@ -1,4 +1,5 @@
 import { Fragment, type CSSProperties } from "react";
+import { ChapterMark } from "@/components/ChapterMark";
 import { ExternalLink } from "@/components/ExternalLink";
 import { Slot } from "@/components/sculpture/Slot";
 import { publishProjects } from "@/content/publish";
@@ -24,10 +25,11 @@ export function Foundations() {
     <section id="foundations" className="section foundations" aria-labelledby="foundations-title" tabIndex={-1}>
       <div className="wrap foundations-grid">
         <div className="foundations-head content">
-          <h2 id="foundations-title" className="t-statement" data-reveal="lines" data-grow>
+          <ChapterMark id="foundations" />
+          <h2 id="foundations-title" className="t-statement" data-reveal="phrases" data-grow>
             <Grow text={foundations.heading} />
           </h2>
-          <p className="t-lede foundations-intro" data-reveal="fade" data-reveal-delay="0.2">
+          <p className="t-lede foundations-intro" data-reveal="lede" data-reveal-delay="0.45">
             {foundations.intro}
           </p>
         </div>
@@ -36,6 +38,7 @@ export function Foundations() {
           {foundations.items.map((item) => (
             <li className="course" key={item.name}>
               <span className="rule course-rule" aria-hidden="true" />
+              <span className="rule-knot" aria-hidden="true" />
               <h3 className="t-course">{item.name}</h3>
               <div className="course-detail">
                 <p className="t-body">{item.note}</p>

@@ -12,6 +12,8 @@
  */
 export const EASE = {
   enter: "expo.out",
+  /** Reading text: settles sooner and more evenly than a heading, so lines can be read as they land. */
+  read: "power3.out",
   move: "power3.inOut",
   scroll: "none",
 } as const;
@@ -19,7 +21,13 @@ export const EASE = {
 export const DURATION = {
   signature: 1.3,
   heading: 1.15,
+  /** A heading line rising out of its mask. */
+  line: 1,
   text: 0.95,
+  /** A group of paragraph lines. */
+  read: 0.75,
+  /** Chapter marks, numbers and other small labels. */
+  label: 0.7,
   field: 1,
 } as const;
 
@@ -28,6 +36,8 @@ export const STAGGER = {
   lines: 0.09,
   words: 0.045,
   items: 0.08,
+  /** Between the two or three groups a paragraph's lines arrive in. */
+  groups: 0.16,
 } as const;
 
 /** Where a section's entrance starts: its top this far down the viewport. */

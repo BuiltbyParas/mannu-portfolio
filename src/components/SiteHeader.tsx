@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type CSSProperties, type MouseEvent } from
 import { PillLabel } from "@/components/PillLabel";
 import { chapters, profile, type ChapterId } from "@/content/site";
 import { holdScroll, scrollToElement } from "@/lib/lenis";
+import { STAGE_CHAPTER } from "@/lib/stage";
 
 const NAV = chapters.filter((c) => c.id !== "top" && c.id !== "contact");
 // Everything focusable outside the menu, including the skip link, goes inert while it is open.
@@ -29,9 +30,12 @@ export function SiteHeader() {
   const sentinelRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
+    // Where the opening's stage holds still, its two sections both fill that band; the stage then
+    // says which one is showing (its `data-chapter`, and an event when that changes; lib/stage.ts).
+    const chapterOf = (section: Element) => ((section.closest<HTMLElement>("[data-chapter]")?.dataset.chapter ?? section.id) as ChapterId);
     const observer = new IntersectionObserver(
       (entries) => {
-        for (const entry of entries) if (entry.isIntersecting) setActive(entry.target.id as ChapterId);
+        for (const entry of entries) if (entry.isIntersecting) setActive(chapterOf(entry.target));
       },
       // A thin band across the middle of the viewport decides the current section.
       { rootMargin: "-45% 0px -54% 0px" },
@@ -40,7 +44,15 @@ export function SiteHeader() {
       const section = document.getElementById(id);
       if (section) observer.observe(section);
     });
-    return () => observer.disconnect();
+    const onStage = (event: Event) => {
+      const id = (event as CustomEvent<ChapterId | null>).detail;
+      if (id) setActive(id);
+    };
+    window.addEventListener(STAGE_CHAPTER, onStage);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener(STAGE_CHAPTER, onStage);
+    };
   }, []);
 
   useEffect(() => {

@@ -1,6 +1,8 @@
 import { RibbonSVG } from "@/components/sculpture/RibbonSVG";
 import { Slot } from "@/components/sculpture/Slot";
 import type { FormId } from "@/components/sculpture/forms";
+import { ChapterMark } from "@/components/ChapterMark";
+import { Tint } from "./Tint";
 import { method } from "@/content/site";
 
 /*
@@ -19,7 +21,10 @@ import { method } from "@/content/site";
  * The numbers sit on a rail whose fill reaches each one as its stage becomes
  * current (motion/stages.ts, which also marks the current stage on the section
  * as `data-step`); each stage's words arrive once, as it nears the reading line
- * (motion/reveals.ts). When the knot closes, the last number rings once.
+ * (motion/reveals.ts: the number wipes up, the title rises word by word, then
+ * its sentence). When the knot closes, the last number rings once and the last
+ * title's citron stroke completes. The heading's words fill from slate to ink
+ * with the scroll, ending on "starting point." in ultramarine, the first stage.
  */
 const STAGE_FORMS: FormId[] = ["understand", "break", "try", "learn"];
 
@@ -27,10 +32,11 @@ export function Method() {
   return (
     <section id="how-i-learn" className="section learn" aria-labelledby="learn-title" tabIndex={-1}>
       <div className="wrap learn-head content">
-        <h2 id="learn-title" className="t-heading" data-reveal="lines">
-          {method.heading}
+        <ChapterMark id="how-i-learn" />
+        <h2 id="learn-title" className="t-heading" data-reveal="progress">
+          <Tint text={method.heading} words={2} />
         </h2>
-        <p className="t-lede learn-intro" data-reveal="fade" data-reveal-delay="0.2">
+        <p className="t-lede learn-intro" data-reveal="lede" data-reveal-delay="0.3">
           {method.intro}
         </p>
       </div>

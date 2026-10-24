@@ -138,6 +138,7 @@ export function computeStrip(state: StripState, out: Strip) {
   const closedness = a.closed === b.closed ? (a.closed ? 1 : 0) : a.closed ? 1 - t : t;
   // How far apart along the strip the change travels: the arriving form decides.
   const stagger = b.stagger ?? STAGGER;
+  const order = b.order;
   const closed = closedness > 0.5;
   out.closed = closedness > 0.98;
 
@@ -155,7 +156,7 @@ export function computeStrip(state: StripState, out: Strip) {
   for (let i = 0; i < n; i++) {
     const s = i / (n - 1);
     S[i] = s;
-    const w = t <= 0 ? 0 : t >= 1 ? 1 : smooth(t * (1 + stagger) - stagger * s);
+    const w = t <= 0 ? 0 : t >= 1 ? 1 : smooth(t * (1 + stagger) - stagger * (order ? order(s) : s));
     blend[i] = w;
     const p = a.point(pieceParam(s, a.pieces, a.gap), pa.aspect);
     const q = w > 0 ? b.point(pieceParam(s, b.pieces, b.gap), pb.aspect) : p;

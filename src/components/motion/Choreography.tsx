@@ -2,7 +2,9 @@
 
 import { threadSignals } from "@/components/sculpture/signals";
 import { gsap, MOTION_OK, ScrollTrigger, useGSAP } from "@/lib/gsap";
+import { STAGE } from "@/lib/stage";
 import { playIntro } from "./intro";
+import { setupLandingFlow, setupOpening } from "./opening";
 import { setupReveals } from "./reveals";
 import { setupScenes } from "./scenes";
 import { setupStages } from "./stages";
@@ -17,7 +19,12 @@ import { setupTrail } from "./trail";
  * Always on (state, not motion): the learning stages and their rail, the trail
  * in the margin, the coil's response to hovered courses, pressed states on
  * touch screens. Only with motion
- * allowed: the opening, the scrubbed scenery and the section entrances.
+ * allowed: the opening, the scrubbed scenery and the section entrances. On
+ * large screens the landing comes first, and the scroll out of it says when
+ * the name's entrance plays (opening.ts, setupLandingFlow); the opening and
+ * Curiosity also share a stage (opening.ts, setupOpening), which takes over
+ * those sections' scrolled motion. The scenery and the entrances are built
+ * again whenever the stage comes or goes with the window.
  *
  * The ribbon itself is driven separately (sculpture/controller.ts) from the
  * same scroll position; this file handles the words, fields and states around it.
@@ -26,14 +33,20 @@ export function Choreography() {
   useGSAP(() => {
     const cleanups = [setupTrail(), setupStages(), linkCoursesToCoil(), enableTouchPress(), refreshOnReflow()];
     const mm = gsap.matchMedia();
-    mm.add(MOTION_OK, () => {
-      const stopIntro = playIntro();
-      const stopScenes = setupScenes();
-      const stopReveals = setupReveals();
+    mm.add(MOTION_OK, () => playIntro());
+    mm.add({ motion: MOTION_OK, stage: STAGE }, (context) => {
+      const { motion, stage } = context.conditions as { motion: boolean; stage: boolean };
+      if (!motion) return;
+      const stopOpening = stage ? setupOpening() : () => {};
+      // The scroll from the landing into the opening says when the name arrives.
+      const stopLanding = setupLandingFlow();
+      const stopScenes = setupScenes(stage);
+      const stopReveals = setupReveals(stage);
       return () => {
         stopReveals();
         stopScenes();
-        stopIntro();
+        stopLanding();
+        stopOpening();
       };
     });
     return () => {

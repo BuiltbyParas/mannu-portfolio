@@ -8,6 +8,11 @@ import { THREAD_READY, threadSignals } from "./signals";
  * page has painted, and only when the visitor allows motion and the browser
  * has WebGL; otherwise the still SVG states inside each slot remain the
  * visual and no canvas work happens at all.
+ *
+ * It is rendered inside the opening's stage (sections/Opening.tsx) so that,
+ * where the stage holds still, the canvas shares its layer with the opening's
+ * words and the name's letters can still pass over and under the ribbon. Being
+ * fixed, it covers the view the same way wherever it sits in the page.
  */
 function webglAvailable() {
   try {

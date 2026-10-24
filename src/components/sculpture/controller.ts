@@ -1,9 +1,12 @@
 import { gsap } from "@/lib/gsap";
+import { stageScroll } from "@/lib/stage";
 import { CLEAR_MAX, createClearance, packClearance } from "./clearance";
 import { FORMS, type FormId } from "./forms";
 import type { RibbonScene } from "./scene";
+import { morphAt } from "./scenery";
 import { threadSignals } from "./signals";
 import { computeStrip, createStrip, type Placement } from "./strip";
+import type { WorldState } from "./world";
 
 /*
  * Drives the ribbon from the page. Each section marks a slot with
@@ -22,6 +25,18 @@ import { computeStrip, createStrip, type Placement } from "./strip";
  * the boxes of the text on screen to the scene as a clearance mask
  * (clearance.ts), which matters in transit, when a strip crossing to the next
  * slot would otherwise run behind a heading.
+ *
+ * On large screens the opening and Curiosity share one stage that holds still
+ * while the page scrolls (sections/Opening.tsx). Their slots name their moment
+ * on it (`data-stage-at`, lib/stage.ts) instead of being placed by the scroll,
+ * the change between them follows the opening's own progress
+ * (threadSignals.opening, scenery.ts), and the world of glass spheres
+ * (world.ts) is placed from the same value and moves with the stage while it
+ * rises into view from under the landing and when it is released. The opening's
+ * form rests on the landing's name (sections/Landing.tsx), above the stage, so
+ * the ribbon is drawn from the first frame, while the world is not drawn until
+ * the stage comes into view. The ribbon itself is not rebuilt while it has not
+ * threaded in yet.
  */
 
 type Slot = {
@@ -70,12 +85,15 @@ export function createController(scene: RibbonScene, canvas: HTMLCanvasElement, 
   let lastActivity = 0;
   let frame = 0;
   const pointer = { x: 0, y: 0, px: -1, py: -1, inside: false };
+  // The opening's stage the canvas lives on (sections/Opening.tsx); the world moves with it.
+  const stage = canvas.closest<HTMLElement>(".opening-stage");
   const rotation: [number, number, number] = [0, 0, 0];
   const drawn: [number, number, number] = [0, 0, 0];
   const signals = { flourish: 0 };
   let flourished = false;
   let flourishTween: gsap.core.Tween | null = null;
   let drawnReveal = -1;
+  let drawnOpening = -2;
   let activeForm: FormId | null = null;
   // Live box positions, read at most once per frame.
   const boxRects = new Map<HTMLElement, DOMRect>();
@@ -99,16 +117,16 @@ export function createController(scene: RibbonScene, canvas: HTMLCanvasElement, 
           left: b.left,
           width: b.width,
           height: b.height,
-          // Anchored slots rest when their own centre crosses the middle of the screen.
-          rest: r.top + scrollY + r.height / 2 - height / 2,
+          // A slot rests when its own centre crosses the middle of the screen, or, on the
+          // opening's stage (where nothing moves with the scroll), at its named moment.
+          rest: stageScroll(el) ?? r.top + scrollY + r.height / 2 - height / 2,
         };
       })
       .filter((s) => s.form in FORMS && s.width > 0 && s.height > 0)
-      .sort((a, b) => a.top - b.top);
+      .sort((a, b) => a.rest - b.rest);
     let previous = -Infinity;
     for (const slot of slots) {
-      const rest = clamp(slot.box ? slot.rest : slot.top + slot.height / 2 - height / 2, 0, maxScroll);
-      slot.rest = Math.max(rest, previous + 1);
+      slot.rest = Math.max(clamp(slot.rest, 0, maxScroll), previous + 1);
       previous = slot.rest;
     }
     clearance.measure();
@@ -127,8 +145,14 @@ export function createController(scene: RibbonScene, canvas: HTMLCanvasElement, 
     dirty = true;
   }
 
+  /** True while the opening's stage is in use and its ribbon change is under way. */
+  function onStage(scrollY: number) {
+    return threadSignals.opening >= 0 && slots.length > 1 && slots[0].form === "hero" && slots[1].form === "curiosity" && scrollY < slots[1].rest;
+  }
+
   function targetProgress(scrollY: number) {
     if (slots.length < 2) return 0;
+    if (onStage(scrollY)) return morphAt(threadSignals.opening);
     if (scrollY <= slots[0].rest) return 0;
     const last = slots.length - 1;
     if (scrollY >= slots[last].rest) return last;
@@ -143,7 +167,29 @@ export function createController(scene: RibbonScene, canvas: HTMLCanvasElement, 
     const from = slots.find((s) => s.form === "hero");
     const to = slots.find((s) => s.form === "curiosity");
     if (!from || !to || to.rest <= from.rest) return 0;
+    // On the opening's stage the world's glass carries the travel instead (scenery.ts).
+    if (threadSignals.opening >= 0) return 0;
     return clamp((scrollY - from.rest) / (to.rest - from.rest), 0, 1);
+  }
+
+  /**
+   * The world while the opening's stage is on screen, or null while it is not
+   * (still below the landing, gone past, or not in use). The stage's own box
+   * says where it is: below its place while it rises into view, above it once
+   * released.
+   */
+  function worldState(idle: number): WorldState | null {
+    if (threadSignals.opening < 0 || !stage) return null;
+    const top = stage.getBoundingClientRect().top;
+    if (top >= height || -top >= height) return null;
+    return {
+      progress: threadSignals.opening,
+      shift: -top / scene.pixelsPerUnit,
+      stageBottom: Math.max(0, -top) * scene.pixelRatio,
+      stageTop: (height - Math.max(0, top)) * scene.pixelRatio,
+      time,
+      idle,
+    };
   }
 
   function boxTop(slot: Slot, scrollY: number) {
@@ -156,8 +202,27 @@ export function createController(scene: RibbonScene, canvas: HTMLCanvasElement, 
     return rect.top;
   }
 
+  /**
+   * How far the landing has been carried away as the opening's stage rises to its place (0 while it
+   * is still wholly below, 1 once it holds). The ribbon's first form leaves the name with it and
+   * drifts to the middle of the view instead of scrolling off the top, so it is there to cross the
+   * stage's sky on its way into Curiosity's loops.
+   */
+  function carried() {
+    if (threadSignals.opening < 0 || !stage) return 0;
+    const lift = 1 - clamp(stage.getBoundingClientRect().top / height, 0, 1);
+    return smoothstep(0.25, 0.95, lift);
+  }
+
   function placement(slot: Slot, scrollY: number, shrink: number): Placement {
-    const [x, y] = scene.toWorld(slot.left + slot.width / 2, boxTop(slot, scrollY) + slot.height / 2, width, height);
+    let cx = slot.left + slot.width / 2;
+    let cy = boxTop(slot, scrollY) + slot.height / 2;
+    if (slot.form === "hero") {
+      const c = carried();
+      cx += (width * 0.4 - cx) * c;
+      cy += (height * 0.5 - cy) * c;
+    }
+    const [x, y] = scene.toWorld(cx, cy, width, height);
     const aspect = slot.width / slot.height;
     // Narrow boxes (tablet columns, phones) scale the form down instead of letting it spill.
     const fit = Math.min(1, aspect / FORMS[slot.form].minAspect) * shrink;
@@ -200,10 +265,13 @@ export function createController(scene: RibbonScene, canvas: HTMLCanvasElement, 
     const scrollY = window.scrollY;
     const target = targetProgress(scrollY);
     const before = progress;
-    progress = Math.abs(target - progress) < 1e-4 ? target : damp(progress, target, 5.5, dt);
+    // On the opening's stage the progress is already eased (motion/opening.ts) and shared with the
+    // words, so it is followed as it is; easing it again would let the ribbon lag behind them.
+    const staged = onStage(scrollY) && progress <= 1.001;
+    progress = staged || Math.abs(target - progress) < 1e-4 ? target : damp(progress, target, 5.5, dt);
     const passageBefore = passage;
     const passageGoal = passageTarget(scrollY);
-    passage = Math.abs(passageGoal - passage) < 1e-4 ? passageGoal : damp(passage, passageGoal, 5.5, dt);
+    passage = staged || Math.abs(passageGoal - passage) < 1e-4 ? passageGoal : damp(passage, passageGoal, 5.5, dt);
 
     const last = slots.length - 1;
     const k = Math.min(Math.max(0, Math.floor(progress)), Math.max(0, last - 1));
@@ -262,48 +330,62 @@ export function createController(scene: RibbonScene, canvas: HTMLCanvasElement, 
     if (performance.now() - measuredAt > 1500) measure();
 
     const reveal = threadSignals.reveal;
+    const opening = threadSignals.opening;
     const moving =
-      dirty || progress !== before || passage !== passageBefore || scrollY !== lastScroll || reveal !== drawnReveal || signals.flourish > 0;
+      dirty ||
+      progress !== before ||
+      passage !== passageBefore ||
+      scrollY !== lastScroll ||
+      reveal !== drawnReveal ||
+      opening !== drawnOpening ||
+      signals.flourish > 0;
     if (!moving && !turning && !shaping && !(flying && awake > 0)) return;
     // Sway alone is slow: half the frame rate is plenty for it.
     frame++;
     if (!moving && !shaping && frame % 2) return;
     dirty = false;
     lastScroll = scrollY;
+    // Until the ribbon starts to thread in (below the landing), there is nothing of it to rebuild.
+    const ribbon = reveal > 0 || drawnReveal !== 0;
 
-    // In transit between sections the strip draws in a little, so it crosses less of the page.
-    const shrink = 1 - 0.14 * Math.sin(Math.PI * t);
-    let ripple;
-    if (rippleAmount > 0.002 && pointer.px >= 0) {
-      const [x, y] = scene.toWorld(pointer.px, pointer.py, width, height);
-      const ledger = fa.ripple ? A : B;
-      ripple = { x, y, radius: 0.6 * (ledger.height / 2 / scene.pixelsPerUnit), amount: rippleAmount };
+    if (ribbon) {
+      // In transit between sections the strip draws in a little, so it crosses less of the page.
+      const shrink = 1 - 0.14 * Math.sin(Math.PI * t);
+      let ripple;
+      if (rippleAmount > 0.002 && pointer.px >= 0) {
+        const [x, y] = scene.toWorld(pointer.px, pointer.py, width, height);
+        const ledger = fa.ripple ? A : B;
+        ripple = { x, y, radius: 0.6 * (ledger.height / 2 / scene.pixelsPerUnit), amount: rippleAmount };
+      }
+      computeStrip(
+        {
+          a: fa,
+          b: fb,
+          t,
+          pa: placement(A, scrollY, shrink),
+          pb: placement(B, scrollY, shrink),
+          reveal,
+          ripple,
+          emphasis: emphasis > 0.002 ? { from: emphasisTurn / 4, to: (emphasisTurn + 1) / 4, amount: 0.3 * emphasis } : undefined,
+        },
+        strip,
+      );
+      drawn[0] = rotation[0];
+      drawn[1] = rotation[1] + signals.flourish * TAU;
+      drawn[2] = rotation[2];
+      drawnReveal = reveal;
+      // Shadows belong to resting forms; in flight they would land far from the strip. Nor is
+      // there one before the ribbon has begun to thread in.
+      scene.update(
+        strip,
+        drawn,
+        (fa.shadow + (fb.shadow - fa.shadow) * t) * (1 - Math.sin(Math.PI * t)) * Math.min(1, reveal * 4),
+        1 + 0.05 * Math.sin(Math.PI * signals.flourish),
+      );
+      scene.updateDust(passage, drift, strip);
     }
-    computeStrip(
-      {
-        a: fa,
-        b: fb,
-        t,
-        pa: placement(A, scrollY, shrink),
-        pb: placement(B, scrollY, shrink),
-        reveal,
-        ripple,
-        emphasis: emphasis > 0.002 ? { from: emphasisTurn / 4, to: (emphasisTurn + 1) / 4, amount: 0.3 * emphasis } : undefined,
-      },
-      strip,
-    );
-    drawn[0] = rotation[0];
-    drawn[1] = rotation[1] + signals.flourish * TAU;
-    drawn[2] = rotation[2];
-    drawnReveal = reveal;
-    // Shadows belong to resting forms; in flight they would land far from the strip.
-    scene.update(
-      strip,
-      drawn,
-      (fa.shadow + (fb.shadow - fa.shadow) * t) * (1 - Math.sin(Math.PI * t)),
-      1 + 0.05 * Math.sin(Math.PI * signals.flourish),
-    );
-    scene.updateDust(passage, drift, strip);
+    drawnOpening = opening;
+    scene.updateWorld(worldState(idle));
     // The fade around the words: a little wider on large screens.
     const soft = clamp(width * 0.016, 14, 26);
     const clearCount = packClearance(clearance.read(height, soft), width, height, scene.pixelRatio, soft, cleared);
