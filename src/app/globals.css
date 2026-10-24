@@ -1326,15 +1326,23 @@ html.menu-open {
     /* The opening's sky (.sky-landing); the landing's lower edge reflects its top into itself (.landing::after). */
     --sky-horizon:
       radial-gradient(36% 15% at 58% 60%, rgb(255 128 107 / 0.2), transparent 75%),
-      linear-gradient(to bottom, transparent 56.5%, rgb(255 255 255 / 0.92) 60%, transparent 64%),
+      linear-gradient(
+        to bottom,
+        transparent 46%,
+        rgb(255 255 255 / 0.28) 54%,
+        rgb(255 255 255 / 0.5) 60%,
+        rgb(255 255 255 / 0.28) 67%,
+        transparent 76%
+      ),
       radial-gradient(80% 70% at 12% 4%, rgb(220 231 255 / 0.9), transparent 68%),
       linear-gradient(
         to bottom,
         #f2f4fa 0%,
         #f8f7f6 38%,
-        #fcf4ef 57.5%,
-        #f0f2f5 61%,
-        #e9edf5 80%,
+        #fbf4f0 55%,
+        #f5f3f4 63%,
+        #eef0f5 72%,
+        #e9edf5 84%,
         #e3e9f6 100%
       );
   }
