@@ -205,7 +205,7 @@ export function createController(scene: RibbonScene, canvas: HTMLCanvasElement, 
   /**
    * How far the landing has been carried away as the opening's stage rises to its place (0 while it
    * is still wholly below, 1 once it holds). The ribbon's first form leaves the name with it and
-   * drifts to the middle of the view instead of scrolling off the top, so it is there to cross the
+   * drifts to the open lower part of the view instead of scrolling off the top, so it is there to cross the
    * stage's sky on its way into Curiosity's loops.
    */
   function carried() {
@@ -219,8 +219,8 @@ export function createController(scene: RibbonScene, canvas: HTMLCanvasElement, 
     let cy = boxTop(slot, scrollY) + slot.height / 2;
     if (slot.form === "hero") {
       const c = carried();
-      cx += (width * 0.4 - cx) * c;
-      cy += (height * 0.5 - cy) * c;
+      cx += (width * 0.42 - cx) * c;
+      cy += (height * 0.66 - cy) * c;
     }
     const [x, y] = scene.toWorld(cx, cy, width, height);
     const aspect = slot.width / slot.height;

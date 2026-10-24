@@ -1490,7 +1490,7 @@ html.menu-open {
 @media (min-width: 1024px) and (min-height: 600px) and (prefers-reduced-motion: no-preference) {
   .stage-live {
     --rest-run: 0px;
-    --opening-run: 100vh;
+    --opening-run: 85vh;
   }
   .stage-live .opening {
     position: relative;
